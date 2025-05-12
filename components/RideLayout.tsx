@@ -3,7 +3,7 @@ import React, { useCallback } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { icons } from '@/constants';
 import { router, usePathname } from 'expo-router';
-import Map from '@/components/Map';
+import RideMap from '@/components/RideMap';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 
@@ -25,7 +25,7 @@ const RideLayout = ({
   origin,
   destination,
   waypoints = [],
-  MapComponent = Map,
+  MapComponent = RideMap,
   bottomSheetRef,
   useScrollView = true,
 }: {

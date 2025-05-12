@@ -1360,7 +1360,7 @@ const RideDetails = () => {
 
       switch (ride?.status) {
         case 'available':
-        case 'full':
+          case 'full':
           return (
             <View className="p-4 m-3">
               {isRideTime && (
@@ -1543,8 +1543,8 @@ const RideDetails = () => {
                 <Text className="text-lg font-CairoBold mb-3 text-right text-gray-800">التقييم العام</Text>
                 <View className="py-2">
                   <AirbnbRating
-                    reviewColor='#F79824'
-                    showRating
+                    reviewColor="#F79824"
+                    showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, overall: value }))}
                     size={35}
                     defaultRating={rating.overall}
@@ -1561,8 +1561,8 @@ const RideDetails = () => {
                 </View>
                 <View className="py-2">
                   <AirbnbRating
-                    reviewColor='#F79824'
-                    showRating
+                    reviewColor="#F79824"
+                    showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, driving: value }))}
                     size={35}
                     defaultRating={rating.driving}
@@ -1579,8 +1579,8 @@ const RideDetails = () => {
                 </View>
                 <View className="py-2">
                   <AirbnbRating
-                    reviewColor='#F79824'
-                    showRating
+                    reviewColor="#F79824"
+                    showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, behavior: value }))}
                     size={35}
                     defaultRating={rating.behavior}
@@ -1597,8 +1597,8 @@ const RideDetails = () => {
                 </View>
                 <View className="py-2">
                   <AirbnbRating
-                    reviewColor='#F79824'
-                    showRating
+                    reviewColor="#F79824"
+                    showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, punctuality: value }))}
                     size={35}
                     defaultRating={rating.punctuality}
@@ -1615,8 +1615,8 @@ const RideDetails = () => {
                 </View>
                 <View className="py-2">
                   <AirbnbRating
-                    reviewColor='#F79824'
-                    showRating
+                    reviewColor="#F79824"
+                    showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, cleanliness: value }))}
                     size={35}
                     defaultRating={rating.cleanliness}
@@ -1776,7 +1776,7 @@ const RideDetails = () => {
     </Modal>
   );
 
-  // Add this function to check if 15 minutes have passed
+  // Add this function to check if current time is within 15 minutes of ride time
   const checkRideTime = (rideDateTime: string) => {
     console.log('Checking ride time for:', rideDateTime);
     const [datePart, timePart] = rideDateTime.split(' ');
@@ -1784,11 +1784,11 @@ const RideDetails = () => {
     const [hour, minute] = timePart.split(':').map(Number);
     const rideDate = new Date(year, month - 1, day, hour, minute);
     const currentDate = new Date();
-    const diffInMinutes = (currentDate.getTime() - rideDate.getTime()) / (1000 * 60);
+    const diffInMinutes = Math.abs((rideDate.getTime() - currentDate.getTime()) / (1000 * 60));
     console.log('Ride date:', rideDate);
     console.log('Current date:', currentDate);
     console.log('Difference in minutes:', diffInMinutes);
-    return diffInMinutes >= 15;
+    return diffInMinutes <= 15; // Return true if within 15 minutes of ride time
   };
 
   // Add useEffect to update isRideTime when ride data changes
