@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Switch, TouchableOpacity, Share, Platform, Linking, Image } from 'react-native';
 import { ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ import * as Location from 'expo-location';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useLocationStore } from '@/store';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function SideMenu(props: DrawerContentComponentProps) {
   const { language, setLanguage, t } = useLanguage();
@@ -17,10 +19,30 @@ export default function SideMenu(props: DrawerContentComponentProps) {
   const { signOut } = useAuth();
   const { user } = useUser();
   const isRTL = language === 'ar';
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   const [locationEnabled, setLocationEnabled] = useState(true);
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const userRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
+          setProfileImageUrl(imageUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
 
+    fetchUserProfile();
+  }, [user?.id]);
 
   const toggleLocation = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -64,18 +86,23 @@ export default function SideMenu(props: DrawerContentComponentProps) {
 
   return (
     <DrawerContentScrollView {...props}>
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          backgroundColor: '#fff',
-          paddingHorizontal: 18,
-          paddingTop: 24,
-          paddingBottom: 12,
-        }}
-        className="rounded-tr-[22px] rounded-br-[22px]"
-      >
+     
         {/* User Info Section */}
-        <View className="mt-4 mb-6 items-center w-full">
+        <View className="mt-2 mb-6 items-center w-full">
+          <TouchableOpacity 
+            onPress={() => router.push('/(root)/profilePage')}
+            className="w-20 h-20 items-center justify-center rounded-full bg-gray-100 overflow-hidden mb-3"
+          >
+            {profileImageUrl ? (
+              <Image
+                source={{ uri: profileImageUrl }}
+                style={{ width: 80, height: 80, borderRadius: 40 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <MaterialIcons name="person" size={40} color="#f97316" />
+            )}
+          </TouchableOpacity>
           <Text className="text-xl font-bold text-black mb-1 text-center">
             {user?.fullName || user?.firstName || t.user}
           </Text>
@@ -86,7 +113,16 @@ export default function SideMenu(props: DrawerContentComponentProps) {
 
         {/* Decorative Orange Line */}
         <View className="h-[6px] w-full rounded bg-orange-100 mb-4" />
-
+ <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          backgroundColor: '#fff',
+          paddingHorizontal: 18,
+          paddingTop: 5,
+          paddingBottom: 5,
+        }}
+        className="rounded-tr-[22px] rounded-br-[22px]"
+      >
         {/* Account Section */}
         <Text className={`text-gray-400 text-xs mb-2 mt-2 font-semibold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>{t.account}</Text>
         
@@ -116,10 +152,6 @@ export default function SideMenu(props: DrawerContentComponentProps) {
             </Text>
           </View>
         </TouchableOpacity>
-
-
-
-
 
         <TouchableOpacity
           onPress={() => router.push('/(root)/location')}

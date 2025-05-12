@@ -13,11 +13,14 @@ import { Platform } from 'react-native';
 import Header from '@/components/Header';
 import { LinearGradient } from 'expo-linear-gradient';
 import { icons } from '@/constants';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface Ride {
   id: string;
   origin_address: string;
   destination_address: string;
+  origin_street?: string;
+  destination_street?: string;
   ride_datetime: string;
   status: string;
   driver_id: string;
@@ -41,6 +44,12 @@ interface Ride {
     name: string;
     profile_image_url: string;
   };
+  waypoints?: Array<{
+    address: string;
+    street?: string;
+    latitude: number;
+    longitude: number;
+  }>;
 }
 
 interface RideWithRequests extends Ride {
@@ -72,6 +81,8 @@ export default function Rides() {
   const [pastPassengerRides, setPastPassengerRides] = useState<RideWithRequests[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'pending' | 'completed' | 'cancelled'>('all');
   const [rideTypeFilter, setRideTypeFilter] = useState<'all' | 'created' | 'registered'>('all');
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   // Cache helper functions
   const cacheRidesData = async (data: CachedData) => {
@@ -247,6 +258,7 @@ export default function Rides() {
             created_at: rideData.created_at instanceof Date ? rideData.created_at : new Date(rideData.created_at),
             updated_at: rideData.updated_at instanceof Date ? rideData.updated_at : new Date(rideData.updated_at),
             is_recurring: rideData.is_recurring || false,
+            waypoints: rideData.waypoints || [],
           };
         })
       );
@@ -372,9 +384,16 @@ export default function Rides() {
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
                   <Image source={icons.pin} className="w-5 h-5" resizeMode="contain" />
                 </View>
-                <Text className="flex-1 text-base font-CairoMedium" numberOfLines={1}>
-                  {item.origin_address}
-                </Text>
+                <View className="flex-1">
+                  <Text className="text-base font-CairoMedium" numberOfLines={1}>
+                    {item.origin_address}
+                  </Text>
+                  {item.origin_street && (
+                    <Text className="text-sm text-gray-500 font-CairoRegular mt-1" numberOfLines={1}>
+                      {item.origin_street}
+                    </Text>
+                  )}
+                </View>
               </View>
 
               {/* Add waypoints display */}
@@ -385,9 +404,11 @@ export default function Rides() {
                       <Image source={icons.map} className="w-5 h-5" tintColor="#F79824" />
                     </View>
                     <View className="flex-1">
-                     
+                      <Text className="text-base font-CairoMedium" numberOfLines={1}>
+                        نقطة توقف {index + 1}: {waypoint.address}
+                      </Text>
                       {waypoint.street && (
-                        <Text className="text-sm text-gray-500 font-CairoBold mt-1" numberOfLines={1}>
+                        <Text className="text-sm text-gray-500 font-CairoRegular mt-1" numberOfLines={1}>
                           {waypoint.street}
                         </Text>
                       )}
@@ -400,9 +421,16 @@ export default function Rides() {
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
                   <Image source={icons.target} className="w-5 h-5" />
                 </View>
-                <Text className="flex-1 text-base font-CairoMedium" numberOfLines={1}>
-                  {item.destination_address}
-                </Text>
+                <View className="flex-1">
+                  <Text className="text-base font-CairoMedium" numberOfLines={1}>
+                    {item.destination_address}
+                  </Text>
+                  {item.destination_street && (
+                    <Text className="text-sm text-gray-500 font-CairoRegular mt-1" numberOfLines={1}>
+                      {item.destination_street}
+                    </Text>
+                  )}
+                </View>
               </View>
 
               <View className="flex-row justify-between ml-2 items-center mb-3">
@@ -424,23 +452,20 @@ export default function Rides() {
                         })()}
                       </Text>
                     </View>
-                   
                   </View>
-                   
                 </View>
-                
               </View>
                
               <View className="flex-row items-center ml-2 justify-between mb-3">
                 <View className="flex-row items-center">
-                <Image source={icons.person} className="w-4 h-4 mr-2" />
-                <Text className="text-sm text-gray-500 font-CairoMedium">{item.available_seats} مقاعد متاحة</Text>
+                  <Image source={icons.person} className="w-4 h-4 mr-2" />
+                  <Text className="text-sm text-gray-500 font-CairoMedium">{item.available_seats} مقاعد متاحة</Text>
                 </View>
                 {item.is_recurring && (
-                      <View className="flex-row items-center mt-1">
-                        <Text className="text-xs text-orange-500 font-CairoBold">رحلة متكررة</Text>
-                      </View>
-                    )}
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-xs text-orange-500 font-CairoBold">رحلة متكررة</Text>
+                  </View>
+                )}
               </View>
 
               {item.driver && (
@@ -703,9 +728,26 @@ export default function Rides() {
     fetchRides();
   }, [fetchRides]);
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (userId) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', userId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setProfileImageUrl(userData.profile_image_url || userData.driver?.profile_image_url || null);
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        }
+      }
+    };
+    fetchUserProfile();
+  }, [userId]);
+
   return (
-    <SafeAreaView className="bg-general-500 flex-1">
-      <Header pageTitle="رحلاتي" />
+    <SafeAreaView className="flex-1 bg-white">
+      <Header profileImageUrl={profileImageUrl} title={t.Rides} />
 
       <View className="flex-row justify-around items-center px-4 py-2 border-b border-gray-200">
         <TouchableOpacity

@@ -5,6 +5,8 @@ export const translations = {
     skip: "تخطي",
     getStarted: "انطلق",
     CreateAcc: "انشاء حساب",
+    Search: "بحث",
+    searchDrivers: "ابحث عن السائقين",
     onboarding: [
       {
         title: "سافر بذكاء، وفر وقتك مع وصلني!",
@@ -222,10 +224,29 @@ export const translations = {
     delete: "حذف",
     deleteAccount: "حذف الحساب",
     deleteAccountDescription: "تأكيد حذف الحساب",
-    
-
-    
-    
+    trackRide: "تتبع الرحلة",
+    driver: "السائق",
+    inProgress: "قيد التنفيذ",
+    completed: "مكتملة",
+    contactDriver: "تواصل مع السائق",
+    emergencyContact: "اتصال طوارئ",
+    emergencyContactDescription: "هل أنت متأكد من أنك تريد الاتصال بالطوارئ؟",
+    callEmergency: "اتصال بالطوارئ",
+    rideInProgress: "الرحلة جارية بشكل طبيعي",
+    rideDelayed: "تأخير في الرحلة",
+    rideAlert: "تنبيه: لم يتم تحديث موقع الرحلة",
+    estimatedArrival: "الوصول المتوقع",
+    setParentEmail: "إضافة بريد الوالدين",
+    parentEmailPlaceholder: "أدخل بريد الوالدين",
+    saveParentEmail: "حفظ البريد",
+    parentEmailSet: "تم حفظ بريد الوالدين بنجاح",
+    parentEmailError: "حدث خطأ أثناء حفظ بريد الوالدين",
+    checkIn: "تسجيل الوصول",
+    checkOut: "تسجيل المغادرة",
+    checkInSuccess: "تم تسجيل الوصول بنجاح",
+    checkInError: "حدث خطأ أثناء تسجيل الوصول",
+    checkOutSuccess: "تم تسجيل المغادرة بنجاح",
+    checkOutError: "حدث خطأ أثناء تسجيل المغادرة",
   },
   en: {
     chooseLanguage: "Choose Language",
@@ -233,6 +254,8 @@ export const translations = {
     skip: "Skip",
     getStarted: "Get Started",
     CreateAcc: "Create Account",
+    Search: "Search",
+    searchDrivers: "Search Drivers",
     onboarding: [
       {
         title: "Travel smart, save time with Wasselny!",
@@ -240,7 +263,7 @@ export const translations = {
       },
       {
         title: "Be a Driver and Help Others!",
-        description: "If you have an empty seat, don’t ride alone! Share your trip and help people while reducing travel costs."
+        description: "If you have an empty seat, don't ride alone! Share your trip and help people while reducing travel costs."
       },
       {
         title: "Ready to Go?",
@@ -503,9 +526,28 @@ editProfile: "Edit Profile",
 
     Tubas: "Tubas",
 
-    
-
-
-
+    trackRide: "Track Ride",
+    driver: "Driver",
+    inProgress: "In Progress",
+    completed: "Completed",
+    contactDriver: "Contact Driver",
+    emergencyContact: "Emergency Contact",
+    emergencyContactDescription: "Are you sure you want to make an emergency call?",
+    callEmergency: "Call Emergency",
+    rideInProgress: "Ride is proceeding normally",
+    rideDelayed: "Ride is delayed",
+    rideAlert: "Alert: Ride location not updated",
+    estimatedArrival: "Estimated Arrival",
+    setParentEmail: "Add Parent Email",
+    parentEmailPlaceholder: "Enter parent's email",
+    saveParentEmail: "Save Email",
+    parentEmailSet: "Parent email saved successfully",
+    parentEmailError: "Error saving parent email",
+    checkIn: "Check In",
+    checkOut: "Check Out",
+    checkInSuccess: "Successfully checked in",
+    checkInError: "Error checking in",
+    checkOutSuccess: "Successfully checked out",
+    checkOutError: "Error checking out",
   },
 };
