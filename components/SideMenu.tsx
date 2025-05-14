@@ -85,7 +85,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
   };
 
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView  {...props}>
      
         {/* User Info Section */}
         <View className="mt-2 mb-6 items-center w-full">
@@ -169,6 +169,98 @@ export default function SideMenu(props: DrawerContentComponentProps) {
 
         {/* Divider */}
         <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
+        
+
+        {/* Tracking Section */}
+        <Text className={`text-gray-400 text-xs mb-2 mt-2 font-semibold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>
+          {language === 'ar' ? 'التتبع' : 'Tracking'}
+        </Text>
+        
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/(root)/track');
+            props.navigation.closeDrawer();
+          }}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <MaterialIcons name="location-searching" size={22} color="#fff" />
+          </View>
+          <Text className={`text-base font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'تتبع الرحلات' : 'Track Rides'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/(root)/track-requests');
+            props.navigation.closeDrawer();
+          }}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <MaterialIcons name="notifications" size={22} color="#fff" />
+          </View>
+          <Text className={`text-base font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'طلبات التتبع' : 'Track Requests'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/(root)/my-shares');
+            props.navigation.closeDrawer();
+          }}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <MaterialIcons name="share" size={22} color="#fff" />
+          </View>
+          <Text className={`text-base font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'مشاركاتي' : 'My Shares'}
+          </Text>
+        </TouchableOpacity>
+        {/* Divider */}
+        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
+
+{/* Rides Section */}
+<Text className={`text-gray-400 text-xs mb-2 mt-2 font-semibold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>
+          {language === 'ar' ? 'الرحلات' : 'Rides'}
+        </Text>
+        
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/(root)/(tabs)/rides');
+            props.navigation.closeDrawer();
+          }}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <MaterialIcons name="directions-car" size={22} color="#fff" />
+          </View>
+          <Text className={`text-base font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'رحلاتي' : 'My Rides'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/(root)/create-ride');
+            props.navigation.closeDrawer();
+          }}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <MaterialIcons name="add-circle" size={22} color="#fff" />
+          </View>
+          <Text className={`text-base font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'إنشاء رحلة' : 'Create Ride'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Support Section */}
         <Text className={`text-gray-400 text-xs mb-2 mt-2 font-semibold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>{t.support}</Text>

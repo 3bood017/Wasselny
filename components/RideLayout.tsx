@@ -124,7 +124,8 @@ const RideLayout = ({
             width: 60,
             height: 5,
             borderRadius: 3,
-            marginTop: 10,
+            marginTop: 12,
+            marginBottom: 12,
           }}
           onChange={handleSheetChanges}
         >
