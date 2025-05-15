@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Platform, ActivityIndicator, Modal, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -106,6 +106,7 @@ const BarrierDetails = () => {
   const [barrier, setBarrier] = useState<Barrier | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { user } = useUser();
 
   useEffect(() => {
@@ -261,17 +262,26 @@ const BarrierDetails = () => {
                   </Text>
                 </View>
               </View>
+              {barrier.imageUrl && (
+                <TouchableOpacity 
+                  onPress={() => setSelectedImage(barrier.imageUrl)}
+                  className="mb-3"
+                >
+                  <Image
+                    source={{ uri: barrier.imageUrl }}
+                    className="w-full h-40 rounded-lg"
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.error('Main image loading error:', error.nativeEvent.error);
+                      console.error('Failed image URL:', barrier.imageUrl);
+                    }}
+                  />
+                </TouchableOpacity>
+              )}
               {barrier.description && (
                 <Text className={`text-gray-600 mb-3 text-base font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {barrier.description}
                 </Text>
-              )}
-              {barrier.imageUrl && (
-                <Image
-                  source={{ uri: barrier.imageUrl }}
-                  className="w-full h-56 rounded-lg mb-3"
-                  resizeMode="cover"
-                />
               )}
               <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center bg-gray-50 p-3 rounded-lg`}>
                 <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center flex-1`}>
@@ -289,11 +299,11 @@ const BarrierDetails = () => {
             </View>
 
             {/* Update History */}
+            <Text className={`text-xl mx-2 my-2 font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} text-gray-800`}>
+              {language === 'ar' ? 'سجل التحديثات' : 'Update History'}
+            </Text>
             {barrier.updates && barrier.updates.length > 0 && (
               <View className="bg-white p-4 rounded-xl border border-gray-200">
-                <Text className={`text-xl mb-4 font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} text-gray-800`}>
-                  {language === 'ar' ? 'سجل التحديثات' : 'Update History'}
-                </Text>
                 {[...barrier.updates]
                   .sort((a, b) => {
                     const dateA = a.updated_at?.seconds ? new Date(a.updated_at.seconds * 1000) : new Date(0);
@@ -301,36 +311,36 @@ const BarrierDetails = () => {
                     return dateB.getTime() - dateA.getTime();
                   })
                   .map((update: any, index: number) => (
-                  <View key={index} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
-                    <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} justify-between items-center mb-2`}>
-                      <View 
-                        className="px-4 py-2 rounded-full"
-                        style={{ backgroundColor: getStatusColor(update.status) }}
-                      >
-                        <Text className="text-white text-base font-CairoBold" numberOfLines={1}>
-                          {getStatusText(update.status)}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center bg-gray-50 p-3 rounded-lg mb-2`}>
-                      <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center flex-1`}>
-                        <Text className={`text-gray-600 text-sm font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} flex-1`}>
-                          {formatDate(update.updated_at).date}
-                        </Text>
-                        <View className="bg-white px-3 py-1 rounded-full mx-2 border border-gray-200">
-                          <Text className="text-orange-600 text-sm font-CairoBold">
-                            {formatDate(update.updated_at).time}
+                    <View key={index} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
+                      <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} justify-between items-center mb-2`}>
+                        <View 
+                          className="px-4 py-2 rounded-full"
+                          style={{ backgroundColor: getStatusColor(update.status) }}
+                        >
+                          <Text className="text-white text-base font-CairoBold" numberOfLines={1}>
+                            {getStatusText(update.status)}
                           </Text>
                         </View>
                       </View>
+                      <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center bg-gray-50 p-3 rounded-lg mb-2`}>
+                        <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center flex-1`}>
+                          <Text className={`text-gray-600 text-sm font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} flex-1`}>
+                            {formatDate(update.updated_at).date}
+                          </Text>
+                          <View className="bg-white px-3 py-1 rounded-full mx-2 border border-gray-200">
+                            <Text className="text-orange-600 text-sm font-CairoBold">
+                              {formatDate(update.updated_at).time}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      {update.description && (
+                        <Text className={`text-gray-600 text-base font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                          {update.description}
+                        </Text>
+                      )}
                     </View>
-                    {update.description && (
-                      <Text className={`text-gray-600 text-base font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                        {update.description}
-                      </Text>
-                    )}
-                  </View>
-                ))}
+                  ))}
               </View>
             )}
           </View>
@@ -342,6 +352,48 @@ const BarrierDetails = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={!!selectedImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1}
+          onPress={() => setSelectedImage(null)}
+          className="flex-1 bg-black/90 justify-center items-center"
+        >
+          <View className="absolute top-4 right-4 z-10">
+            <TouchableOpacity
+              onPress={() => setSelectedImage(null)}
+              className="bg-white/20 w-10 h-10 justify-center items-center rounded-full"
+            >
+              <Image
+                source={icons.close}
+                style={{ width: 18, height: 18, tintColor: '#fff' }}
+              />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+            className="w-full h-full justify-center items-center"
+          >
+            {selectedImage && (
+              <Image
+                source={{ uri: selectedImage }}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            )}
+          </TouchableOpacity>
+          <Text className="absolute bottom-8 text-white/70 text-sm font-CairoRegular">
+            {language === 'ar' ? 'انقر في أي مكان للإغلاق' : 'Tap anywhere to close'}
+          </Text>
+        </TouchableOpacity>
+      </Modal>
 
       <TouchableOpacity
         onPress={() => {
