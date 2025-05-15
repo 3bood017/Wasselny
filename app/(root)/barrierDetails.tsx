@@ -357,41 +357,20 @@ const BarrierDetails = () => {
       <Modal
         visible={!!selectedImage}
         transparent={true}
-        animationType="fade"
         onRequestClose={() => setSelectedImage(null)}
       >
         <TouchableOpacity 
-          activeOpacity={1}
+          className="flex-1 bg-black/90 items-center justify-center"
           onPress={() => setSelectedImage(null)}
-          className="flex-1 bg-black/90 justify-center items-center"
+          activeOpacity={1}
         >
-          <View className="absolute top-4 right-4 z-10">
-            <TouchableOpacity
-              onPress={() => setSelectedImage(null)}
-              className="bg-white/20 w-10 h-10 justify-center items-center rounded-full"
-            >
-              <Image
-                source={icons.close}
-                style={{ width: 18, height: 18, tintColor: '#fff' }}
-              />
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity 
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-            className="w-full h-full justify-center items-center"
-          >
-            {selectedImage && (
-              <Image
-                source={{ uri: selectedImage }}
-                className="w-full h-full"
-                resizeMode="contain"
-              />
-            )}
-          </TouchableOpacity>
-          <Text className="absolute bottom-8 text-white/70 text-sm font-CairoRegular">
-            {language === 'ar' ? 'انقر في أي مكان للإغلاق' : 'Tap anywhere to close'}
-          </Text>
+          {selectedImage && (
+            <Image
+              source={{ uri: selectedImage }}
+              className="w-full h-full rounded-xl"
+              resizeMode="contain"
+            />
+          )}
         </TouchableOpacity>
       </Modal>
 
