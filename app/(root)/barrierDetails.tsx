@@ -294,7 +294,13 @@ const BarrierDetails = () => {
                 <Text className={`text-xl mb-4 font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} text-gray-800`}>
                   {language === 'ar' ? 'سجل التحديثات' : 'Update History'}
                 </Text>
-                {barrier.updates.map((update: any, index: number) => (
+                {[...barrier.updates]
+                  .sort((a, b) => {
+                    const dateA = a.updated_at?.seconds ? new Date(a.updated_at.seconds * 1000) : new Date(0);
+                    const dateB = b.updated_at?.seconds ? new Date(b.updated_at.seconds * 1000) : new Date(0);
+                    return dateB.getTime() - dateA.getTime();
+                  })
+                  .map((update: any, index: number) => (
                   <View key={index} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
                     <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} justify-between items-center mb-2`}>
                       <View 
