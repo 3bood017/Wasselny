@@ -641,6 +641,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                   {isRTL ? 'إلغاء' : 'Cancel'}
                 </Text>
               </TouchableOpacity>
+              
               <TouchableOpacity 
                 style={[
                   styles.actionButton,
@@ -649,8 +650,11 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                 onPress={() => {
                   if (selectedUser) {
                     startLocationSharing();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    
                   }
                 }}
+                
                 disabled={!selectedUser}
               >
                 <Text style={[
@@ -658,6 +662,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                   !selectedUser && styles.disabledButtonText
                 ]}>
                   {isRTL ? 'بدء المشاركة' : 'Start Sharing'}
+                  
                 </Text>
               </TouchableOpacity>
             </View>
