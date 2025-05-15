@@ -451,7 +451,7 @@ const CheckpointDetails: React.FC = () => {
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-gray-100">
-      <Header pageTitle={checkpoint.name} />
+      <Header pageTitle={checkpoint.name} showSideMenu={false} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{

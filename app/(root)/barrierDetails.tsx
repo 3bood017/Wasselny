@@ -10,6 +10,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { PALESTINIAN_CITIES, CityData, BarrierData } from '@/constants/cities';
+import { useUser } from '@clerk/clerk-expo';
 
 interface BarrierUpdate {
   status: 'open' | 'closed' | 'delayed' | 'heavy_traffic' | 'military_presence' | 'random_check' | 'smooth_traffic';
@@ -81,7 +82,7 @@ const STATUS_OPTIONS = {
     ar: 'مفتوح مع تفتيش هويات',
     color: '#f59e0b'
   },
-  open_with_random_check: {
+  random_check: {
     en: 'Open with Random Check',
     ar: 'مفتوح مع تفتيش عشوائي',
     color: '#f59e0b'
@@ -104,6 +105,8 @@ const BarrierDetails = () => {
   const { t, language } = useLanguage();
   const [barrier, setBarrier] = useState<Barrier | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const { user } = useUser();
 
   useEffect(() => {
     const fetchBarrierDetails = async () => {
@@ -126,6 +129,27 @@ const BarrierDetails = () => {
 
     fetchBarrierDetails();
   }, [id]);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const userRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
+          setProfileImageUrl(imageUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, [user?.id]);
 
   const getStatusColor = (status: string) => {
     return STATUS_OPTIONS[status as keyof typeof STATUS_OPTIONS]?.color || 'bg-gray-500';
@@ -170,7 +194,7 @@ const BarrierDetails = () => {
   if (loading) {
     return (
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
-        <Header pageTitle={language === 'ar' ? 'تفاصيل الحاجز' : 'Barrier Details'} />
+        <Header title={language === 'ar' ? 'تفاصيل الحاجز' : 'Barrier Details' } showSideMenu={false} />
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#f97316" />
         </View>
@@ -181,7 +205,7 @@ const BarrierDetails = () => {
   if (!barrier) {
     return (
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
-        <Header pageTitle={language === 'ar' ? 'تفاصيل الحاجز' : 'Barrier Details'} />
+        <Header title={language === 'ar' ? 'تفاصيل الحاجز' : 'Barrier Details' } showSideMenu={false} />
         <View className="flex-1 justify-center items-center">
           <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
             {language === 'ar' ? 'لم يتم العثور على الحاجز' : 'Barrier not found'}
@@ -193,7 +217,12 @@ const BarrierDetails = () => {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
-      <Header pageTitle={language === 'ar' ? 'تفاصيل الحاجز' : 'Barrier Details'} />
+      <Header 
+        title={language === 'ar' ? 'تفاصيل الحاجز' : 'Barrier Details'} 
+        showSideMenu={false}
+        profileImageUrl={profileImageUrl}
+        showProfileImage={true}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -208,44 +237,50 @@ const BarrierDetails = () => {
           <View className="px-4 py-4">
             {/* Barrier Info */}
             <View className="bg-white p-4 rounded-xl mb-4 border border-gray-200">
-              <View className="flex-row-reverse justify-between items-center mb-2">
-                <View className="flex-1">
-                  <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} text-gray-800`}>
-                    {PALESTINIAN_CITIES[barrier.city]?.barriers.find((b: BarrierData) => b.en === barrier.barrier)?.ar || barrier.barrier}
+              <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} justify-between items-center mb-3`}>
+                <View className="flex-1 mr-2">
+                  <Text className={`text-xl ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} ${language === 'ar' ? 'text-right' : 'text-left'} text-gray-800`}>
+                    {language === 'ar' 
+                      ? PALESTINIAN_CITIES[barrier.city]?.barriers.find((b: BarrierData) => b.en === barrier.barrier)?.ar || barrier.barrier
+                      : barrier.barrier
+                    }
                   </Text>
-                  <Text className={`text-sm ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} text-gray-500`}>
-                    {PALESTINIAN_CITIES[barrier.city]?.ar || barrier.city}
+                  <Text className={`text-base ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} ${language === 'ar' ? 'text-right' : 'text-left'} text-gray-500 mt-1`}>
+                    {language === 'ar'
+                      ? PALESTINIAN_CITIES[barrier.city]?.ar || barrier.city
+                      : barrier.city
+                    }
                   </Text>
                 </View>
                 <View 
-                  className="px-3 py-1 rounded-full ml-2"
+                  className="px-4 py-2 rounded-full"
                   style={{ backgroundColor: getStatusColor(barrier.status) }}
                 >
-                  <Text className="text-white text-sm mt-1 font-CairoBold">
+                  <Text className="text-white text-base font-CairoBold" numberOfLines={1}>
                     {getStatusText(barrier.status)}
                   </Text>
                 </View>
               </View>
               {barrier.description && (
-                <Text className={`text-gray-600 mb-2 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+                <Text className={`text-gray-600 mb-3 text-base font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {barrier.description}
                 </Text>
               )}
               {barrier.imageUrl && (
                 <Image
                   source={{ uri: barrier.imageUrl }}
-                  className="w-full h-48 rounded-lg mb-2"
+                  className="w-full h-56 rounded-lg mb-3"
                   resizeMode="cover"
                 />
               )}
-              <View className="flex-row-reverse justify-between items-center">
-                <View className="flex-row-reverse items-center">
-                  <Text className={`text-gray-400 text-sm ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+              <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center bg-gray-50 p-3 rounded-lg`}>
+                <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center flex-1`}>
+                  <Text className={`text-gray-600 text-sm font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} flex-1`}>
                     {language === 'ar' ? 'آخر تحديث: ' : 'Last Updated: '}
                     {formatDate(barrier.updated_at).date}
                   </Text>
-                  <View className="bg-gray-100 px-2 py-1 rounded-full mx-2">
-                    <Text className={`text-orange-600 text-sm ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+                  <View className="bg-white px-3 py-1 rounded-full mx-2 border border-gray-200">
+                    <Text className="text-orange-600 text-sm font-CairoBold">
                       {formatDate(barrier.updated_at).time}
                     </Text>
                   </View>
@@ -256,33 +291,35 @@ const BarrierDetails = () => {
             {/* Update History */}
             {barrier.updates && barrier.updates.length > 0 && (
               <View className="bg-white p-4 rounded-xl border border-gray-200">
-                <Text className={`text-lg mb-4 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} text-gray-800`}>
+                <Text className={`text-xl mb-4 font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} text-gray-800`}>
                   {language === 'ar' ? 'سجل التحديثات' : 'Update History'}
                 </Text>
                 {barrier.updates.map((update: any, index: number) => (
                   <View key={index} className="mb-4 pb-4 border-b border-gray-200 last:border-b-0 last:mb-0 last:pb-0">
-                    <View className="flex-row justify-between items-center mb-2">
+                    <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} justify-between items-center mb-2`}>
                       <View 
-                        className="px-3 py-1 rounded-full ml-2"
+                        className="px-4 py-2 rounded-full"
                         style={{ backgroundColor: getStatusColor(update.status) }}
                       >
-                        <Text className="text-white text-sm font-bold">
+                        <Text className="text-white text-base font-CairoBold" numberOfLines={1}>
                           {getStatusText(update.status)}
                         </Text>
                       </View>
-                      <View className="flex-row items-center">
-                        <Text className={`text-gray-400 text-sm ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+                    </View>
+                    <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center bg-gray-50 p-3 rounded-lg mb-2`}>
+                      <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center flex-1`}>
+                        <Text className={`text-gray-600 text-sm font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'} flex-1`}>
                           {formatDate(update.updated_at).date}
                         </Text>
-                        <View className="bg-gray-100 px-2 py-1 rounded-full mx-2">
-                          <Text className={`text-orange-600 text-sm ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+                        <View className="bg-white px-3 py-1 rounded-full mx-2 border border-gray-200">
+                          <Text className="text-orange-600 text-sm font-CairoBold">
                             {formatDate(update.updated_at).time}
                           </Text>
                         </View>
                       </View>
                     </View>
                     {update.description && (
-                      <Text className={`text-gray-600 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+                      <Text className={`text-gray-600 text-base font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                         {update.description}
                       </Text>
                     )}
