@@ -374,47 +374,7 @@ const BarrierDetails = () => {
         </TouchableOpacity>
       </Modal>
 
-      <TouchableOpacity
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          router.back();
-        }}
-        style={{
-          position: 'absolute',
-          right: 16,
-          bottom: 20,
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          justifyContent: 'center',
-          alignItems: 'center',
-          elevation: Platform.OS === 'android' ? 4 : 0,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: Platform.OS === 'ios' ? 0.25 : 0,
-          shadowRadius: Platform.OS === 'ios' ? 3.84 : 0,
-          zIndex: 1000,
-        }}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={['#f97316', '#ea580c']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Image
-            source={icons.backArrow}
-            style={{ width: 24, height: 24, tintColor: '#fff' }}
-          />
-        </LinearGradient>
-      </TouchableOpacity>
+      
     </SafeAreaView>
   );
 };
