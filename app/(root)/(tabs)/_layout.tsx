@@ -54,7 +54,12 @@ const Layout = () => {
           swipeEdgeWidth: 50,
         }}
       >
-        <Drawer.Screen name="tabs">
+        <Drawer.Screen 
+          name="tabs" 
+          options={{
+            headerShown: false,
+          }}
+        >
           {() => (
             <Tabs
               screenOptions={{
@@ -103,19 +108,20 @@ const Layout = () => {
               <Tabs.Screen
                 name="rides"
                 options={{
-                  title: "rides",
+                  title: "Rides",
                   headerShown: false,
                   tabBarIcon: ({ focused }) => (
-                    <TabIcon focused={focused} source={icons.list} name="Rides"/>
+                    <TabIcon focused={focused} source={icons.list} name="Rides" />
                   ),
                 }}
               />
               <Tabs.Screen
                 name="barriers"
                 options={{
+                  title: "Barriers",
                   headerShown: false,
                   tabBarIcon: ({ focused }) => (
-                    <TabIcon focused={focused} source={icons.barrier} name="Barrier" />
+                    <TabIcon focused={focused} source={icons.barrier} name="Barriers" />
                   ),
                 }}
               />
@@ -124,11 +130,10 @@ const Layout = () => {
                 options={{
                   headerShown: false,
                   tabBarIcon: ({ focused }) => (
-                    <TabIcon focused={focused} source={icons.chat} name="Chat"/>
+                    <TabIcon focused={focused} source={icons.chat} name="Chat" />
                   ),
                 }}
               />
-              
             </Tabs>
           )}
         </Drawer.Screen>

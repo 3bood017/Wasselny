@@ -199,19 +199,20 @@ const industryMap = new Map([
   };
   
   return (
-       <View className="flex-1">
-      <ScrollView 
-        className="flex-1 bg-white" 
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+       <SafeAreaView className="flex-1">
+       
       <View className="flex-1 bg-white">
-        <View className="relative w-full h-[250px]">
-          <Image source={images.signUpCar} className="z-0 w-full h-[250px]" />
-          <Text className={`text-[25px] text-black ${language === 'ar' ? 'font-CairoExtraBold right-5' : 'font-JakartaSemiBold left-5'} absolute bottom-5`}>
+        <View className="relative items-center w-full h-[70px]">
+          {/* <Image source={images.signUpCar} className="z-0 w-full h-[150px]" /> */}
+          <Text className={`text-[25px] text-black ${language === 'ar' ? 'font-CairoExtraBold' : 'font-JakartaSemiBold left-5'} absolute bottom-2`}>
             {t.signUp}
           </Text>
         </View>
+        <ScrollView 
+          className="flex-1 bg-white mt-5" 
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <View className="-pt-1 px-5 pb-10">
           {/* حقل رقم الهاتف */}
           <InputField
@@ -275,11 +276,12 @@ const industryMap = new Map([
           />
 
           {/* اختيار الجنس */}
+          <View className="mb-4 flex-row justify-between">
           <TouchableOpacity
             onPress={() => setShowGenderModal(true)}
-            className="my-2"
+            className="my-2 w-[45%]"
           >
-            <Text className={`text-lg font-JakartaSemiBold mb-3 text-orange-500 ${language === 'ar' ? 'text-right font-CairoBold' : 'text-left font-JakartaBold'}`}>
+            <Text className={`text-lg font-JakartaSemiBold mb-3 text-orange-500 ${language === 'ar' ? 'text-right font-CairoBold mr-2' : 'text-left font-JakartaBold ml-2'}`}>
               {t.gender}
             </Text>
             <View className={`flex flex-row ${language === 'ar' ? 'flex-row-reverse' : ''} items-center bg-neutral-100 rounded-full p-4 border border-secondary-500`}>
@@ -292,7 +294,7 @@ const industryMap = new Map([
           {/* اختيار مجال العمل */}
           <TouchableOpacity
             onPress={() => setShowIndustryModal(true)}
-            className="my-2"
+            className="my-2 w-[45%]"
           >
             <Text className={`text-lg font-JakartaSemiBold mb-3 text-orange-500 ${language === 'ar' ? 'text-right font-CairoBold' : 'text-left font-JakartaBold'}`}>
               {t.workIndustry}
@@ -303,6 +305,7 @@ const industryMap = new Map([
               </Text>
             </View>
           </TouchableOpacity>
+          </View>
                     {/* Terms and Conditions Checkbox */}
       <View className={`flex-row items-center my-4 ${language === 'ar' ? 'flex-row-reverse font-CairoBold' : 'flex-row font-JakartaBold'}`}>
         <TouchableOpacity
@@ -479,10 +482,10 @@ const industryMap = new Map([
 </Modal>
 
 
-      </View>
       </ScrollView>
-      <StatusBar backgroundColor="#fff" style="dark" />
       </View>
+      <StatusBar backgroundColor="#fff" style="dark" />
+      </SafeAreaView>
   );
 };
 

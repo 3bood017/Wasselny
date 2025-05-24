@@ -437,7 +437,7 @@ export default function Rides() {
             className="rounded-2xl shadow-sm overflow-hidden"
           >
             <View
-              className={`absolute top-4 right-4 px-3 py-1 rounded-full ${
+              className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'} px-3 py-1 rounded-full ${
                 item.status === 'available' ? 'bg-[#E6F4EA]' :
                 item.status === 'pending' ? 'bg-[#FFF3E0]' :
                 item.status === 'completed' ? 'bg-[#E8F0FE]' :
@@ -458,82 +458,172 @@ export default function Rides() {
 
             <View className="p-4">
               <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
-                  <Image source={icons.pin} className="w-5 h-5" resizeMode="contain" />
-                </View>
-                <View className="flex-1">
-                  <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                    {item.origin_address}
-                  </Text>
-                  {item.origin_street && (
-                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} mt-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                      {item.origin_street}
-                    </Text>
-                  )}
-                </View>
+                {language === 'ar' ? (
+                  <>
+                    <View className="flex-1">
+                      <Text className="text-base font-CairoMedium text-right" numberOfLines={1}>
+                        {item.origin_address}
+                      </Text>
+                      {item.origin_street && (
+                        <Text className="text-sm text-gray-500 font-CairoRegular mt-1 text-right" numberOfLines={1}>
+                          {item.origin_street}
+                        </Text>
+                      )}
+                    </View>
+                    <View className="w-8 h-8 rounded-full items-center justify-center ml-3">
+                      <Image source={icons.pin} className="w-5 h-5" resizeMode="contain" />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
+                      <Image source={icons.pin} className="w-5 h-5" resizeMode="contain" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-base font-JakartaMedium text-left" numberOfLines={1}>
+                        {item.origin_address}
+                      </Text>
+                      {item.origin_street && (
+                        <Text className="text-sm text-gray-500 font-JakartaRegular mt-1 text-left" numberOfLines={1}>
+                          {item.origin_street}
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                )}
               </View>
 
               {/* Add waypoints display */}
               {item.waypoints && item.waypoints.length > 0 && (
                 item.waypoints.map((waypoint, index) => (
                   <View key={index} className="flex-row items-center mb-4">
-                    <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
-                      <Image source={icons.map} className="w-5 h-5" tintColor="#F79824" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                        {`${t.stop} ${index + 1}: ${waypoint.address}`}
-                      </Text>
-                      {waypoint.street && (
-                        <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} mt-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                          {waypoint.street}
-                        </Text>
-                      )}
-                    </View>
+                    {language === 'ar' ? (
+                      <>
+                        <View className="flex-1">
+                          <Text className="text-base font-CairoMedium text-right" numberOfLines={1}>
+                            {`${t.stop} ${index + 1}: ${waypoint.address}`}
+                          </Text>
+                          {waypoint.street && (
+                            <Text className="text-sm text-gray-500 font-CairoRegular mt-1 text-right" numberOfLines={1}>
+                              {waypoint.street}
+                            </Text>
+                          )}
+                        </View>
+                        <View className="w-8 h-8 rounded-full items-center justify-center ml-3">
+                          <Image source={icons.map} className="w-5 h-5" tintColor="#F79824" />
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
+                          <Image source={icons.map} className="w-5 h-5" tintColor="#F79824" />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-base font-JakartaMedium text-left" numberOfLines={1}>
+                            {`${t.stop} ${index + 1}: ${waypoint.address}`}
+                          </Text>
+                          {waypoint.street && (
+                            <Text className="text-sm text-gray-500 font-JakartaRegular mt-1 text-left" numberOfLines={1}>
+                              {waypoint.street}
+                            </Text>
+                          )}
+                        </View>
+                      </>
+                    )}
                   </View>
                 ))
               )}
 
               <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
-                  <Image source={icons.target} className="w-5 h-5" />
-                </View>
-                <View className="flex-1">
-                  <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                    {item.destination_address}
-                  </Text>
-                  {item.destination_street && (
-                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'} mt-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                      {item.destination_street}
-                    </Text>
-                  )}
-                </View>
+                {language === 'ar' ? (
+                  <>
+                    <View className="flex-1">
+                      <Text className="text-base font-CairoMedium text-right" numberOfLines={1}>
+                        {item.destination_address}
+                      </Text>
+                      {item.destination_street && (
+                        <Text className="text-sm text-gray-500 font-CairoRegular mt-1 text-right" numberOfLines={1}>
+                          {item.destination_street}
+                        </Text>
+                      )}
+                    </View>
+                    <View className="w-8 h-8 rounded-full items-center justify-center ml-3">
+                      <Image source={icons.target} className="w-5 h-5" />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
+                      <Image source={icons.target} className="w-5 h-5" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-base font-JakartaMedium text-left" numberOfLines={1}>
+                        {item.destination_address}
+                      </Text>
+                      {item.destination_street && (
+                        <Text className="text-sm text-gray-500 font-JakartaRegular mt-1 text-left" numberOfLines={1}>
+                          {item.destination_street}
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                )}
               </View>
 
               <View className="flex-row justify-between ml-2 items-center mb-3">
-                <View className="flex-row items-center">
-                  <Image source={icons.clock} className="w-4 h-4 mr-2" />
-                  <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
-                    {formatTimeWithPeriod(item.ride_datetime)}
-                  </Text>
-                </View>
-                <View className="flex-row items-center">
-                  <Image source={icons.calendar} className="w-4 mb-5 h-4 mr-2" />
-                  <View className={`items-${language === 'ar' ? 'end' : 'start'}`}>
-                    <Text className={`text-sm text-gray-700 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-                      {formatDateWithMonth(item.ride_datetime)}
-                    </Text>
-                    <View className="flex-row items-center mt-0.5">
-                      <Text className={`text-xs text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
-                        {item.is_recurring ? formattedRideDays : (() => {
-                          const date = parseRideDateTime(item.ride_datetime);
-                          if (!date) return '';
-                          return language === 'ar' ? arabicDays[date.getDay()] : englishDays[date.getDay()];
-                        })()}
+                {language === 'ar' ? (
+                  <>
+                    <View className="flex-row items-center">
+                      <Image source={icons.calendar} className="w-4 h-4 mr-2" />
+                      <View className="items-end">
+                        <Text className={`text-sm text-gray-700 font-CairoBold`}>
+                          {formatDateWithMonth(item.ride_datetime)}
+                        </Text>
+                        <Text className={`text-xs text-gray-500 font-CairoMedium`}>
+                          {item.is_recurring ? formattedRideDays : (() => {
+                            const date = parseRideDateTime(item.ride_datetime);
+                            if (!date) return '';
+                            return arabicDays[date.getDay()];
+                          })()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Text className={`text-sm text-gray-500 font-CairoMedium ml-3`}>
+                        {formatTimeWithPeriod(item.ride_datetime)}
+                      </Text>
+                      <View className="w-8 h-8 rounded-full items-center justify-center ml-3">
+                        <Image source={icons.clock} className="w-5 h-5" />
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View className="flex-row items-center">
+                      <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
+                        <Image source={icons.clock} className="w-5 h-5" />
+                      </View>
+                      <Text className="text-sm text-gray-500 font-JakartaMedium">
+                        {formatTimeWithPeriod(item.ride_datetime)}
                       </Text>
                     </View>
-                  </View>
-                </View>
+                    <View className="flex-row items-center">
+                      <Image source={icons.calendar} className="w-4 h-4 mr-2" />
+                      <View className="items-start">
+                        <Text className="text-sm text-gray-700 font-JakartaBold">
+                          {formatDateWithMonth(item.ride_datetime)}
+                        </Text>
+                        <Text className="text-xs text-gray-500 font-JakartaMedium">
+                          {item.is_recurring ? formattedRideDays : (() => {
+                            const date = parseRideDateTime(item.ride_datetime);
+                            if (!date) return '';
+                            return englishDays[date.getDay()];
+                          })()}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                )}
               </View>
                
               <View className="flex-row items-center ml-2 justify-between mb-3">

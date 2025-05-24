@@ -27,6 +27,24 @@ import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import Header from "@/components/Header";
 
+type RootStackParamList = {
+  tabs: {
+    screen: string;
+    params?: {
+      searchQuery?: string;
+      origin?: string;
+    };
+  };
+};
+
+type NavigationProp = DrawerNavigationProp<RootStackParamList>;
+
+interface Location {
+  latitude: number;
+  longitude: number;
+  address: string;
+}
+
 function CustomMenuIcon({ isRTL }: { isRTL: boolean }) {
   return (
     <View style={{ width: 24, height: 24, justifyContent: 'center' }}>
@@ -57,15 +75,6 @@ function CustomMenuIcon({ isRTL }: { isRTL: boolean }) {
   );
 }
 
-
-interface Location {
-
-  latitude: number;
-
-  longitude: number;
-
-  address: string;
-}
 export default function Home() {
   const { setIsMenuVisible } = require('@/context/MenuContext').useMenu();
   const { t, language, setLanguage, isRTL } = useLanguage();
@@ -78,7 +87,7 @@ export default function Home() {
   const [isDriver, setIsDriver] = useState<boolean>(false);
   const [isCheckingDriver, setIsCheckingDriver] = useState<boolean>(true);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-  const navigation = useNavigation<DrawerNavigationProp<any>>();
+  const navigation = useNavigation<NavigationProp>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [inProgressRides, setInProgressRides] = useState<Ride[]>([]);
 
@@ -101,12 +110,10 @@ export default function Home() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         console.log('User data:', userData);
-        // Check if user has driver data and is active
         const isUserDriver = userData.driver && userData.driver.is_active === true;
         console.log('Is user a driver?', isUserDriver);
         setIsDriver(isUserDriver);
         
-        // Set profile image URL
         const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
         setProfileImageUrl(imageUrl);
       } else {
@@ -121,7 +128,6 @@ export default function Home() {
     }
   };
        
-  // Add this useEffect to check driver status when user changes
   useEffect(() => {
     console.log('User changed:', user?.id);
     if (user?.id) {
@@ -129,7 +135,6 @@ export default function Home() {
     }
   }, [user?.id]);
 
-  // Add this useFocusEffect to check driver status when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       console.log('Screen focused, checking driver status');
@@ -140,18 +145,35 @@ export default function Home() {
   );
 
   const handleDestinationPress = (location: Location) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: "/(root)/(tabs)/search",
-      params: { 
-        searchQuery: location.address,
-        origin: JSON.stringify({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          address: location.address
-        })
-      }
-    });
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      AsyncStorage.setItem('lastSearchQuery', location.address);
+      
+      navigation.navigate('tabs', { 
+        screen: 'search',
+        params: { 
+          searchQuery: location.address,
+          origin: JSON.stringify({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            address: location.address
+          })
+        }
+      });
+    } catch (error) {
+      console.error('Error handling destination press:', error);
+      Alert.alert(
+        t.error,
+        language === 'ar' ? 'حدث خطأ أثناء البحث' : 'An error occurred while searching'
+      );
+    }
+  };
+
+  const handleSearchTextChange = (text: string) => {
+    if (text.length > 0) {
+      AsyncStorage.setItem('currentSearchText', text);
+    }
   };
 
   useEffect(() => {
@@ -227,14 +249,12 @@ export default function Home() {
     }
   };
 
-  // Fetch in-progress rides when driver status changes
   useEffect(() => {
     if (isDriver && user?.id) {
       fetchInProgressRides();
     }
   }, [isDriver, user?.id]);
 
-  // Refresh in-progress rides when screen focuses
   useFocusEffect(
     useCallback(() => {
       if (isDriver && user?.id) {
@@ -259,7 +279,6 @@ export default function Home() {
       setUserLocation(newLocation);
       await AsyncStorage.setItem('userLocation', JSON.stringify(newLocation));
       
-      // Also refresh in-progress rides for drivers
       if (isDriver && user?.id) {
         await fetchInProgressRides();
       }
@@ -278,7 +297,6 @@ export default function Home() {
         showProfileImage={true}
       />
 
-      {/* Content with Barrier Section below Header */}
       <FlatList 
         data={[]}
         renderItem={() => null}
@@ -289,7 +307,7 @@ export default function Home() {
             <TouchableOpacity 
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push('/(root)/(tabs)/barriers');
+                navigation.navigate('tabs', { screen: 'barriers' });
               }}
               className={`bg-orange-50 p-4 rounded-b-[20px] flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} justify-between shadow-lg`}
               style={{
@@ -325,11 +343,22 @@ export default function Home() {
                 handlePress={handleDestinationPress}
                 placeholder={t.searchPlaceholder}
                 textInputBackgroundColor="white"
+                onTextChange={handleSearchTextChange}
+                autoFocus={false}
+                returnKeyType="search"
+                onSubmitEditing={(event) => {
+                  if (event.nativeEvent.text) {
+                    handleDestinationPress({
+                      latitude: 0,
+                      longitude: 0,
+                      address: event.nativeEvent.text
+                    });
+                  }
+                }}
               />
             </View>
 
             <>
-             
               <Text className={`text-xl px-3 mt-5 mb-3 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
                 {t.currentLocation}
               </Text>
@@ -350,7 +379,7 @@ export default function Home() {
                   shadowRadius: 3.84,
                 }}
               >
-               <View className="flex-1">
+                <View className="flex-1">
                   <Text className={`text-gray-900 text-lg ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} mb-1`}>
                     {t.becomeDriver}
                   </Text>
@@ -366,7 +395,6 @@ export default function Home() {
               </TouchableOpacity>
             )}
 
-            {/* In-Progress Rides Section for Drivers */}
             {isDriver && inProgressRides.length > 0 && (
               <>
                 <View className={`flex-row items-center mt-5 mb-3 w-full px-3 ${language === 'ar' ? 'flex-row-reverse justify-between' : 'flex-row justify-between'}`}>
@@ -437,7 +465,6 @@ export default function Home() {
               </>
             )}
 
-            {/* Suggested Rides and Available Rides Side by Side */}
             <View className={`flex-row items-center mt-5 mb-3 w-full px-3 ${language === 'ar' ? 'flex-row-reverse justify-between' : 'flex-row justify-between'}`}>
               <View className={`${language === 'ar' ? 'items-end' : 'items-start'}`}>
                 <Text className={`text-xl ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
@@ -460,7 +487,7 @@ export default function Home() {
                     shadowRadius: Platform.OS === "ios" ? 2.22 : 0,
                   }}
                 >
-                 <LinearGradient
+                  <LinearGradient
                     colors={["#fff", "#fff"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
@@ -471,7 +498,7 @@ export default function Home() {
                       paddingVertical: 6,
                       borderRadius: 20,
                     }}
-                >
+                  >
                     <MaterialIcons name="add" size={20} color="#666666" />
                     <Text className={`text-secondary-700 text-sm ${language === 'ar' ? 'mr-1 font-CairoBold' : 'ml-1 font-JakartaBold'}`}>
                       {t.newRide}
@@ -481,7 +508,7 @@ export default function Home() {
               </View>
             </View>
             <SuggestedRides key={refreshKey} refreshKey={refreshKey} />
-             </>
+          </>
         }
         refreshControl={
           <RefreshControl 
@@ -494,7 +521,6 @@ export default function Home() {
         }
       />
 
-      {/* Floating Action Button for Drivers */}
       {isDriver && (
         <TouchableOpacity
           onPress={() => {

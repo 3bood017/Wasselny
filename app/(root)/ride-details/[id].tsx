@@ -15,6 +15,7 @@ import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { AirbnbRating } from 'react-native-ratings';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface DriverData {
   car_seats?: number;
@@ -152,6 +153,8 @@ const RideDetails = () => {
 
   // Add new state for pending requests count
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
+  const { t, language } = useLanguage();
 
   // Cache helper functions
   const cacheRideDetails = async (rideId: string, rideData: Ride) => {
@@ -807,7 +810,9 @@ const RideDetails = () => {
     try {
       const [date, time] = timeStr.split(' ');
       const [hours, minutes] = time.split(':').map(Number);
-      const period = hours >= 12 ? 'مساءً' : 'صباحاً';
+      const period = hours >= 12 
+        ? (language === 'ar' ? 'مساءً' : 'PM')
+        : (language === 'ar' ? 'صباحاً' : 'AM');
       const formattedHours = hours % 12 || 12;
       return {
         date,
@@ -840,35 +845,32 @@ const RideDetails = () => {
       >
         <TouchableOpacity
           onPress={() => router.push(`/profile/${formattedRide?.driver_id}`)}
-          className="flex-row-reverse items-center "
+          className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}
         >
           <Image
             source={{ uri: formattedRide?.driver?.profile_image_url || DEFAULT_PROFILE_IMAGE }}
-            className="w-16 h-16 rounded-full mr-4"
+            className={`w-16 h-16 rounded-full ${language === 'ar' ? 'ml-4' : 'mr-4'}`}
           />
-          <View className="flex-1 ">
-            <Text className="text-xl mr-2 text-right font-CairoBold mb-1 text-black">{formattedRide?.driver?.name}</Text>
-            <View className="flex-row-reverse justify-between  items-center">
-            <Text className="text-black mr-2 font-CairoMedium">{formattedRide?.driver?.car_type}</Text>
-            <View className='flex-row-reverse'>
-              <FontAwesome5 name="users" size={16} color="#000" />
-            <Text className="text-black mr-1 font-CairoMedium">
-                {`${formattedRide?.driver?.car_seats || DEFAULT_CAR_SEATS} مقاعد السيارة`}
+          <View className="flex-1">
+            <Text className={`text-xl font-CairoBold mb-1 text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              {formattedRide?.driver?.name}
+            </Text>
+            <View className={`flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
+                {formattedRide?.driver?.car_type}
               </Text>
+              <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <FontAwesome5 name="users" size={16} color="#000" />
+                <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'mr-1' : 'ml-1'}`}>
+                  {`${formattedRide?.driver?.car_seats || DEFAULT_CAR_SEATS} ${language === 'ar' ? 'مقاعد السيارة' : 'car seats'}`}
+                </Text>
               </View>
             </View>
           </View>
         </TouchableOpacity>
-        <View className="items-center">
-          <View className="flex-row-reverse justify-between w-full">
-            
-              
-           
-          </View>
-        </View>
       </View>
     ),
-    [formattedRide, allPassengers]
+    [formattedRide, language]
   );
 
   // Render ride details
@@ -878,48 +880,48 @@ const RideDetails = () => {
         className="bg-white w-[98%] mx-1 mt-3 p-4 rounded-xl"
         style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
       >
-        {/* Only show the in-progress message for non-drivers (passengers) */}
         {ride?.status === 'in-progress' && !isDriver && (
           <View className="bg-blue-100 p-3 rounded-lg mb-4">
             <Text className="text-blue-800 font-CairoBold text-center text-lg">
-              الرحلة جارية حالياً - لا يمكن حجز مقعد
+              {language === 'ar' ? 'الرحلة جارية حالياً - لا يمكن حجز مقعد' : 'Ride is in progress - Cannot book a seat'}
             </Text>
           </View>
         )}
         
-        {/* Show different message for drivers when ride is in progress */}
         {ride?.status === 'in-progress' && isDriver && (
           <View className="bg-green-100 p-3 rounded-lg mb-4">
             <Text className="text-green-800 font-CairoBold text-center text-lg">
-              الرحلة جارية حالياً
-                </Text>
-              </View>
-            )}
-        <View className="flex-row-reverse mb-4">
+              {language === 'ar' ? 'الرحلة جارية حالياً' : 'Ride is in progress'}
+            </Text>
+          </View>
+        )}
+
+        <View className={`flex-row mb-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className="flex-1">
+            <View className={`flex-row items-center mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <Image source={icons.point} className={`w-6 h-6 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
               <View className="flex-1">
-            <View className="flex-row-reverse items-center mb-3">
-              <Image source={icons.point} className="w-6 h-6 ml-3" />
-              <View className="flex-1">
-                <Text className="text-lg font-CairoBold text-black text-right">
-                  من: {formattedRide?.origin_address}
+                <Text className={`text-lg font-CairoBold text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'من: ' : 'From: '}{formattedRide?.origin_address}
                 </Text>
                 {formattedRide?.origin_street && (
-                  <Text className="text-sm font-CairoRegular text-gray-600 text-right mt-1">
+                  <Text className={`text-sm font-CairoRegular text-gray-600 mt-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {formattedRide.origin_street}
                   </Text>
                 )}
               </View>
             </View>
+
             {formattedRide?.waypoints && formattedRide.waypoints.length > 0 && (
               formattedRide.waypoints.map((waypoint, index) => (
-                <View key={index} className="flex-row-reverse items-center mb-3">
-                  <Image source={icons.map} className="w-6 h-6 ml-3" tintColor="#F79824" />
+                <View key={index} className={`flex-row items-center mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <Image source={icons.map} className={`w-6 h-6 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} tintColor="#F79824" />
                   <View className="flex-1">
-                    <Text className="text-lg font-CairoBold text-black text-right">
-                      نقطة توقف {index + 1}: {waypoint.address}
+                    <Text className={`text-lg font-CairoBold text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' ? `نقطة توقف ${index + 1}: ` : `Stop ${index + 1}: `}{waypoint.address}
                     </Text>
                     {waypoint.street && (
-                      <Text className="text-sm font-CairoRegular text-gray-600 text-right mt-1">
+                      <Text className={`text-sm font-CairoRegular text-gray-600 mt-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                         {waypoint.street}
                       </Text>
                     )}
@@ -927,14 +929,15 @@ const RideDetails = () => {
                 </View>
               ))
             )}
-            <View className="flex-row-reverse items-center">
-              <Image source={icons.target} className="w-6 h-6 ml-3" />
+
+            <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <Image source={icons.target} className={`w-6 h-6 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
               <View className="flex-1">
-                <Text className="text-lg font-CairoBold text-black text-right">
-                  إلى: {formattedRide?.destination_address}
+                <Text className={`text-lg font-CairoBold text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'إلى: ' : 'To: '}{formattedRide?.destination_address}
                 </Text>
                 {formattedRide?.destination_street && (
-                  <Text className="text-sm font-CairoRegular text-gray-600 text-right mt-1">
+                  <Text className={`text-sm font-CairoRegular text-gray-600 mt-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {formattedRide.destination_street}
                   </Text>
                 )}
@@ -943,34 +946,40 @@ const RideDetails = () => {
           </View>
         </View>
 
-        <View className="flex-row-reverse justify-between mb-4">
-          <View className="flex-row-reverse items-center">
-            <MaterialIcons name="event" size={20} color="#000" className="mr-3" />
-            <Text className="text-black ml-1 font-CairoMedium">{formattedRide?.formattedDateTime?.date}</Text>
+        <View className={`flex-row justify-between mb-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <MaterialIcons name="event" size={20} color="#000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
+            <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+              {formattedRide?.formattedDateTime?.date}
+            </Text>
           </View>
-          <View className="flex-row-reverse items-center">
-            <MaterialIcons name="access-time" size={20} color="#ff0000" className="mr-3" />
-            <Text className="text-red-600 ml-1 font-CairoMedium">{formattedRide?.formattedDateTime?.time}</Text>
+          <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <MaterialIcons name="access-time" size={20} color="#ff0000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
+            <Text className={`text-red-600 font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+              {formattedRide?.formattedDateTime?.time}
+            </Text>
           </View>
         </View>
 
-        <View className="flex-row-reverse justify-between mb-4">
-          <View className="flex-row-reverse items-center">
-            <MaterialIcons name="repeat" size={20} color="#000" className="mr-3" />
-            <Text className="text-black ml-1 font-CairoMedium">
-              {formattedRide?.is_recurring ? 'رحلة متكررة' : 'رحلة لمرة واحدة'}
+        <View className={`flex-row justify-between mb-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <MaterialIcons name="repeat" size={20} color="#000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
+            <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+              {formattedRide?.is_recurring 
+                ? (language === 'ar' ? 'رحلة متكررة' : 'Recurring ride')
+                : (language === 'ar' ? 'رحلة لمرة واحدة' : 'One-time ride')}
             </Text>
           </View>
-          <View className="flex-row-reverse items-center">
-            <MaterialIcons name="event-seat" size={20} color="#000" className="mr-3" />
-            <Text className="text-black ml-1 font-CairoMedium">
-              {`${formattedRide?.available_seats}/${allPassengers.length} مقاعد`}
+          <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <MaterialIcons name="event-seat" size={20} color="#000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
+            <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+              {`${formattedRide?.available_seats}/${allPassengers.length} ${language === 'ar' ? 'مقاعد' : 'seats'}`}
             </Text>
           </View>
         </View>
 
         <View className="mb-4">
-          <View className="flex-row-reverse flex-wrap">
+          <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             {formattedRide?.is_recurring ? (
               formattedRide.ride_days?.map((day, index) => (
                 <View key={index} className="bg-orange-100 px-3 py-1 rounded-full mr-2 mb-2">
@@ -982,7 +991,9 @@ const RideDetails = () => {
                 <Text className="text-orange-800 font-CairoMedium text-sm">
                   {(() => {
                     const date = parse(formattedRide?.formattedDateTime?.date || '', 'dd/MM/yyyy', new Date());
-                    const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                    const days = language === 'ar' 
+                      ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+                      : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                     return days[date.getDay()];
                   })()}
                 </Text>
@@ -992,52 +1003,64 @@ const RideDetails = () => {
         </View>
 
         <View className="mt-4">
-          <Text className="text-lg font-CairoBold text-right mb-4 text-black">تفضيلات الرحلة</Text>
-          <View className="flex-row-reverse flex-wrap">
-            <View className="w-1/2 flex-row-reverse items-center mb-4">
+          <Text className={`text-lg font-CairoBold mb-4 text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'تفضيلات الرحلة' : 'Ride Preferences'}
+          </Text>
+          <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className="w-1/2 flex-row items-center mb-4">
               <MaterialIcons
                 name={formattedRide?.no_smoking ? 'smoke-free' : 'smoking-rooms'}
                 size={24}
                 color="#000"
-                className="mr-3"
+                className={language === 'ar' ? 'ml-3' : 'mr-3'}
               />
-              <Text className="text-black ml-1 font-CairoMedium">
-                {formattedRide?.no_smoking ? 'ممنوع التدخين' : 'مسموح التدخين'}
+              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                {formattedRide?.no_smoking 
+                  ? (language === 'ar' ? 'ممنوع التدخين' : 'No smoking')
+                  : (language === 'ar' ? 'مسموح التدخين' : 'Smoking allowed')}
               </Text>
             </View>
-            <View className="w-1/2 flex-row-reverse items-center mb-4">
+            <View className="w-1/2 flex-row items-center mb-4">
               <MaterialIcons
                 name={formattedRide?.no_music ? 'music-off' : 'music-note'}
                 size={24}
                 color="#000"
-                className="mr-3"
+                className={language === 'ar' ? 'ml-3' : 'mr-3'}
               />
-              <Text className="text-black ml-1 font-CairoMedium">
-                {formattedRide?.no_music ? 'ممنوع الموسيقى' : 'مسموح الموسيقى'}
+              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                {formattedRide?.no_music 
+                  ? (language === 'ar' ? 'ممنوع الموسيقى' : 'No music')
+                  : (language === 'ar' ? 'مسموح الموسيقى' : 'Music allowed')}
               </Text>
             </View>
-            <View className="w-1/2 flex-row-reverse items-center mb-4">
+            <View className="w-1/2 flex-row items-center mb-4">
               <MaterialIcons
                 name={formattedRide?.no_children ? 'child-care' : 'child-friendly'}
                 size={24}
                 color="#000"
-                className="mr-3"
+                className={language === 'ar' ? 'ml-3' : 'mr-3'}
               />
-              <Text className="text-black ml-1 font-CairoMedium">
-                {formattedRide?.no_children ? 'ممنوع الأطفال' : 'مسموح الأطفال'}
+              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                {formattedRide?.no_children 
+                  ? (language === 'ar' ? 'ممنوع الأطفال' : 'No children')
+                  : (language === 'ar' ? 'مسموح الأطفال' : 'Children allowed')}
               </Text>
             </View>
-            <View className="w-1/2 flex-row-reverse items-center mb-4">
-              <MaterialIcons name="wc" size={24} color="#000" className="mr-3" />
-              <Text className="text-black ml-1 font-CairoMedium">
-                {formattedRide?.required_gender === 'ذكر' ? 'ذكور فقط' : formattedRide?.required_gender === 'أنثى' ? 'إناث فقط' : 'جميع الجنسيات'}
+            <View className="w-1/2 flex-row items-center mb-4">
+              <MaterialIcons name="wc" size={24} color="#000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
+              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                {formattedRide?.required_gender === 'ذكر' 
+                  ? (language === 'ar' ? 'ذكور فقط' : 'Males only')
+                  : formattedRide?.required_gender === 'أنثى'
+                  ? (language === 'ar' ? 'إناث فقط' : 'Females only')
+                  : (language === 'ar' ? 'جميع الجنسيات' : 'All genders')}
               </Text>
             </View>
           </View>
         </View>
       </View>
     ),
-    [formattedRide, allPassengers, isDriver] // Added isDriver to dependencies
+    [formattedRide, allPassengers, isDriver, language]
   );
 
   // Render current passengers
@@ -1047,8 +1070,10 @@ const RideDetails = () => {
         className="bg-white w-[98%] mx-1 mt-3 p-4 rounded-xl"
         style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
       >
-        <View className="flex-row-reverse justify-between items-center mb-3">
-          <Text className="text-lg font-CairoBold text-right text-black">الركاب الحاليين</Text>
+        <View className={`flex-row justify-between items-center mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <Text className={`text-lg font-CairoBold text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'الركاب الحاليين' : 'Current Passengers'}
+          </Text>
           {isDriver && (
             <TouchableOpacity
               onPress={() => router.push({
@@ -1066,63 +1091,70 @@ const RideDetails = () => {
                   noChildren: ride?.no_children?.toString()
                 }
               })}
-              className="flex-row-reverse items-center"
+              className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}
             >
-              <View className="flex-row-reverse items-center">
-                <Text className="text-orange-500 font-CairoBold ml-1">طلبات الحجز</Text>
+              <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <Text className={`text-orange-500 font-CairoBold ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                  {language === 'ar' ? 'طلبات الحجز' : 'Booking Requests'}
+                </Text>
                 {pendingRequestsCount > 0 && (
-                  <View className="bg-orange-500 rounded-full w-6 h-6 pt-1 items-center justify-center mr-2">
+                  <View className="bg-orange-500 rounded-full w-6 h-6 pt-1 items-center justify-center">
                     <Text className="text-white font-CairoBold text-sm">{pendingRequestsCount}</Text>
                   </View>
                 )}
               </View>
-              <MaterialIcons name="chevron-left" size={20} color="#f97316" />
+              <MaterialIcons 
+                name={language === 'ar' ? "chevron-left" : "chevron-right"} 
+                size={20} 
+                color="#f97316" 
+              />
             </TouchableOpacity>
           )}
         </View>
         {allPassengers.length > 0 ? (
           <View className="border border-gray-200 rounded-lg overflow-hidden">
-            <View className="flex-row-reverse bg-gray-50 p-3 border-b border-gray-200">
+            <View className={`flex-row bg-gray-50 p-3 border-b border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
               <View className="flex-1">
-                <Text className="text-sm font-CairoBold text-gray-700 text-right">الاسم</Text>
+                <Text className={`text-sm font-CairoBold text-gray-700 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'الاسم' : 'Name'}
+                </Text>
               </View>
-              <View className="w-49 mr-8">
-                <Text className="text-sm font-CairoBold text-gray-700 text-right">نقطة التوقف</Text>
+              <View className="w-49">
+                <Text className={`text-sm font-CairoBold text-gray-700 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'نقطة التوقف' : 'Stop Point'}
+                </Text>
               </View>
             </View>
             {allPassengers.map((passenger) => (
-              <View key={passenger.id} className="flex-row-reverse p-3 border-b border-gray-100">
-                <View className="flex-1 flex-row-reverse items-center">
+              <View key={passenger.id} className={`flex-row p-3 border-b border-gray-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <View className={`flex-1 flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <Image
                     source={icons.person}
-                    className="w-5 h-5 ml-2"
+                    className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`}
                     tintColor="#10B981"
                   />
-                  <Text className="text-sm pt-1.5 text-gray-700 text-right font-CairoRegular">
-                    {passengerNames[passenger.user_id] || 'الراكب'}
+                  <Text className={`text-sm pt-1.5 text-gray-700 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {passengerNames[passenger.user_id] || (language === 'ar' ? 'الراكب' : 'Passenger')}
                   </Text>
                 </View>
-                <View className="w-49 pl-14  justify-center">
-                  <Text className="text-sm pt-1.5 text-gray-700 text-right font-CairoRegular">
+                <View className="w-49 justify-center">
+                  <Text className={`text-sm pt-1.5 text-gray-700 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {passenger.selected_waypoint ? (
                       <>
                         {passenger.selected_waypoint.address === ride?.origin_address ? (
-                          'نقطة البداية'
+                          language === 'ar' ? 'نقطة البداية' : 'Starting Point'
                         ) : ride?.waypoints?.findIndex(
                           wp => wp.address === passenger.selected_waypoint?.address
                         ) !== -1 ? (
-                          <>
-                            
-                            <Text className="text-gray-500 text-lg  mt-1">
-                              {passenger.selected_waypoint.address}
-                            </Text>
-                          </>
+                          <Text className="text-gray-500 text-lg mt-1">
+                            {passenger.selected_waypoint.address}
+                          </Text>
                         ) : (
-                          'نقطة البداية'
+                          language === 'ar' ? 'نقطة البداية' : 'Starting Point'
                         )}
                       </>
                     ) : (
-                      'نقطة البداية'
+                      language === 'ar' ? 'نقطة البداية' : 'Starting Point'
                     )}
                   </Text>
                 </View>
@@ -1131,12 +1163,14 @@ const RideDetails = () => {
           </View>
         ) : (
           <View className="bg-gray-50 p-4 rounded-xl">
-            <Text className="text-base text-gray-700 text-center font-CairoBold">لا يوجد ركاب حالياً</Text>
+            <Text className={`text-base text-gray-700 text-center font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              {language === 'ar' ? 'لا يوجد ركاب حالياً' : 'No passengers at the moment'}
+            </Text>
           </View>
         )}
       </View>
     ),
-    [allPassengers, passengerNames, ride, isDriver, pendingRequestsCount]
+    [allPassengers, passengerNames, ride, isDriver, pendingRequestsCount, language]
   );
 
   // Add these new functions after the existing handle functions
@@ -1373,31 +1407,32 @@ const RideDetails = () => {
         case 'full':
           return (
             <View className="p-4 m-3">
-              {/* Always show start button if it's time, but with different styling based on timing */}
               {isRideTime ? (
                 <CustomButton
-                  title="بدء الرحلة"
+                  title={language === 'ar' ? "بدء الرحلة" : "Start Ride"}
                   onPress={handleStartRide}
                   className="bg-blue-500 py-3 rounded-xl mb-3"
                 />
               ) : (
                 <View className="mb-3">
                   <CustomButton
-                    title="بدء الرحلة"
+                    title={language === 'ar' ? "بدء الرحلة" : "Start Ride"}
                     onPress={handleStartRide}
                     className="bg-gray-400 py-3 rounded-xl"
                     disabled={true}
                   />
-                  <Text className="text-center text-sm text-gray-500 mt-2 font-CairoRegular">
+                  <Text className={`text-center text-sm text-gray-500 mt-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {(() => {
                       const [datePart, timePart] = ride?.ride_datetime?.split(' ') || ['', ''];
-                      return `يمكن بدء الرحلة في ${timePart} بتاريخ ${datePart}`;
+                      return language === 'ar' 
+                        ? `يمكن بدء الرحلة في ${timePart} بتاريخ ${datePart}`
+                        : `Ride can be started at ${timePart} on ${datePart}`;
                     })()}
                   </Text>
                 </View>
               )}
               <CustomButton
-                title="إلغاء الرحلة"
+                title={language === 'ar' ? "إلغاء الرحلة" : "Cancel Ride"}
                 onPress={handleCancelRideByDriver}
                 className="bg-red-500 py-3 rounded-xl"
               />
@@ -1407,7 +1442,7 @@ const RideDetails = () => {
           return (
             <View className="p-4 m-3">
               <CustomButton
-                title="إنهاء الرحلة"
+                title={language === 'ar' ? "إنهاء الرحلة" : "Finish Ride"}
                 onPress={handleFinishRide}
                 className="bg-green-500 py-3 rounded-xl"
               />
@@ -1416,9 +1451,11 @@ const RideDetails = () => {
         case 'completed':
           return (
             <View className="p-4 m-3 bg-green-100 rounded-xl">
-              <View className="flex-row items-center justify-center">
+              <View className={`flex-row items-center justify-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <MaterialIcons name="check-circle" size={24} color="#10B981" />
-                <Text className="text-green-700 font-CairoBold mr-2 text-lg">تم إكمال الرحلة بنجاح</Text>
+                <Text className={`text-green-700 font-CairoBold text-lg ${language === 'ar' ? 'mr-2' : 'ml-2'}`}>
+                  {language === 'ar' ? 'تم إكمال الرحلة بنجاح' : 'Ride completed successfully'}
+                </Text>
               </View>
             </View>
           );
@@ -1435,7 +1472,10 @@ const RideDetails = () => {
           return (
             <View className="p-4 m-3">
               <CustomButton
-                title={ride.available_seats > 0 ? "طلب حجز الرحلة" : "طلب حجز (قائمة الانتظار)"}
+                title={ride.available_seats > 0 
+                  ? (language === 'ar' ? "طلب حجز الرحلة" : "Book Ride")
+                  : (language === 'ar' ? "طلب حجز (قائمة الانتظار)" : "Book (Waitlist)")
+                }
                 onPress={handleBookRide}
                 className={`${ride.available_seats > 0 ? "bg-orange-500" : "bg-yellow-500"} py-3 rounded-xl`}
               />
@@ -1444,24 +1484,24 @@ const RideDetails = () => {
         } else if (ride?.status === 'in-progress') {
           return (
             <View className="p-4 m-3 bg-blue-100 rounded-xl">
-              <Text className="text-blue-800 font-CairoBold text-center text-lg">
-                الرحلة جارية حالياً - لا يمكن حجز مقعد
+              <Text className={`text-blue-800 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'الرحلة جارية حالياً - لا يمكن حجز مقعد' : 'Ride is in progress - Cannot book a seat'}
               </Text>
             </View>
           );
         } else if (ride?.status === 'completed') {
           return (
             <View className="p-4 m-3 bg-gray-100 rounded-xl">
-              <Text className="text-gray-700 font-CairoBold text-center text-lg">
-                تم إكمال الرحلة
+              <Text className={`text-gray-700 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تم إكمال الرحلة' : 'Ride completed'}
               </Text>
             </View>
           );
         } else if (ride?.status === 'cancelled') {
           return (
             <View className="p-4 m-3 bg-gray-100 rounded-xl">
-              <Text className="text-gray-700 font-CairoBold text-center text-lg">
-                تم إلغاء الرحلة
+              <Text className={`text-gray-700 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تم إلغاء الرحلة' : 'Ride cancelled'}
               </Text>
             </View>
           );
@@ -1473,12 +1513,15 @@ const RideDetails = () => {
             return (
               <View className="p-4 m-3">
                 <View className="bg-yellow-100 p-4 rounded-xl mb-3">
-                  <Text className="text-yellow-800 font-CairoBold text-center text-lg">
-                    {rideRequest.is_waitlist ? 'في قائمة الانتظار - سيتم إخطارك عند توفر مقعد' : 'في انتظار موافقة السائق'}
+                  <Text className={`text-yellow-800 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {rideRequest.is_waitlist 
+                      ? (language === 'ar' ? 'في قائمة الانتظار - سيتم إخطارك عند توفر مقعد' : 'On waitlist - You will be notified when a seat is available')
+                      : (language === 'ar' ? 'في انتظار موافقة السائق' : 'Waiting for driver approval')
+                    }
                   </Text>
                 </View>
                 <CustomButton
-                  title="إلغاء طلب الحجز"
+                  title={language === 'ar' ? "إلغاء طلب الحجز" : "Cancel Booking Request"}
                   onPress={handleCancelRide}
                   className="bg-red-500 py-3 rounded-xl"
                 />
@@ -1488,12 +1531,12 @@ const RideDetails = () => {
             return (
               <View className="p-4 m-3">
                 <CustomButton
-                  title="تسجيل الدخول"
+                  title={language === 'ar' ? "تسجيل الدخول" : "Check In"}
                   onPress={handleCheckIn}
                   className="bg-green-500 py-3 rounded-xl mb-3"
                 />
                 <CustomButton
-                  title="إلغاء الحجز"
+                  title={language === 'ar' ? "إلغاء الحجز" : "Cancel Booking"}
                   onPress={handleCancelRide}
                   className="bg-red-500 py-3 rounded-xl"
                 />
@@ -1503,7 +1546,7 @@ const RideDetails = () => {
             return (
               <View className="p-4 m-3">
                 <CustomButton
-                  title="تسجيل الخروج"
+                  title={language === 'ar' ? "تسجيل الخروج" : "Check Out"}
                   onPress={handleCheckOut}
                   className="bg-orange-500 py-3 rounded-xl"
                 />
@@ -1512,24 +1555,24 @@ const RideDetails = () => {
           case 'checked_out':
             return (
               <View className="p-4 m-3 bg-gray-100 rounded-xl">
-                <Text className="text-gray-700 font-CairoBold text-center text-lg">
-                  تم إكمال الرحلة
+                <Text className={`text-gray-700 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'تم إكمال الرحلة' : 'Ride completed'}
                 </Text>
               </View>
             );
           case 'rejected':
             return (
               <View className="p-4 m-3 bg-gray-100 rounded-xl">
-                <Text className="text-gray-700 font-CairoBold text-center text-lg">
-                  تم رفض طلب الحجز
+                <Text className={`text-gray-700 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'تم رفض طلب الحجز' : 'Booking request rejected'}
                 </Text>
               </View>
             );
           case 'cancelled':
             return (
               <View className="p-4 m-3 bg-gray-100 rounded-xl">
-                <Text className="text-gray-700 font-CairoBold text-center text-lg">
-                  تم إلغاء الحجز
+                <Text className={`text-gray-700 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'تم إلغاء الحجز' : 'Booking cancelled'}
                 </Text>
               </View>
             );
@@ -1538,7 +1581,7 @@ const RideDetails = () => {
         }
       }
     }
-  }, [isDriver, ride, rideRequest, allPassengers, isRideTime]);
+  }, [isDriver, ride, rideRequest, allPassengers, isRideTime, language]);
 
   useEffect(() => {
     fetchRideDetails();
@@ -1834,7 +1877,9 @@ const RideDetails = () => {
     return (
       <View className="flex-1 justify-center items-center bg-white">
         <ActivityIndicator size="large" color="#f97316" />
-        <Text className="mt-4 text-black font-CairoMedium">جاري تحميل تفاصيل الرحلة...</Text>
+        <Text className="mt-4 text-black font-CairoMedium">
+          {language === 'ar' ? "جاري تحميل تفاصيل الرحلة..." : "Loading ride details..."}
+        </Text>
       </View>
     );
   }
@@ -1843,9 +1888,11 @@ const RideDetails = () => {
     return (
       <View className="flex-1 justify-center items-center p-4 bg-white">
         <MaterialIcons name="error-outline" size={48} color="#f97316" />
-        <Text className="mt-4 text-black text-center font-CairoMedium">{error || 'الرحلة غير موجودة.'}</Text>
+        <Text className="mt-4 text-black text-center font-CairoMedium">
+          {error || (language === 'ar' ? 'الرحلة غير موجودة.' : 'Ride not found.')}
+        </Text>
         <CustomButton
-          title="إعادة المحاولة"
+          title={language === 'ar' ? "إعادة المحاولة" : "Try Again"}
           onPress={() => {
             if (Platform.OS === 'android') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1855,7 +1902,9 @@ const RideDetails = () => {
           className="mt-4 bg-orange-500 py-3 px-6 rounded-xl"
         />
         <TouchableOpacity onPress={() => router.back()} className="mt-2">
-          <Text className="text-blue-500 font-CairoMedium">العودة</Text>
+          <Text className="text-blue-500 font-CairoMedium">
+            {language === 'ar' ? "العودة" : "Back"}
+          </Text>
         </TouchableOpacity>
       </View>
     );

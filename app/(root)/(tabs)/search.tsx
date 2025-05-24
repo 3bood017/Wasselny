@@ -143,6 +143,7 @@ const Search = () => {
   // Initialize search with query from home page
   useEffect(() => {
     if (params.searchQuery) {
+      setSearchQuery(params.searchQuery as string)
       handleSearch(params.searchQuery as string)
     }
   }, [params.searchQuery])
@@ -375,7 +376,11 @@ const Search = () => {
   const handleSearch = useCallback(async (text: string) => {
     setSearchQuery(text)
     if (!text.trim()) {
-      debouncedApplyFilters(allResults)
+      // When search is cleared, show all results
+      const filteredResults = applyFilters(allResults)
+      setDisplayedResults(filteredResults.slice(0, RIDES_PER_PAGE))
+      setCurrentIndex(RIDES_PER_PAGE)
+      setHasMore(filteredResults.length > RIDES_PER_PAGE)
       return
     }
     setLoading(true)
@@ -880,6 +885,7 @@ const Search = () => {
               onChangeText={handleSearchInput}
               className={`flex-1 ${language === 'ar' ? 'text-right' : 'text-left'} font-CairoBold text-gray-700`}
               placeholderTextColor="#9CA3AF"
+              autoFocus={true}
             />
           </View>
           <TouchableOpacity
