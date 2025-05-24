@@ -978,7 +978,7 @@ const RideDetails = () => {
           </View>
         </View>
 
-        <View className="mb-4">
+        <View className="mb-1">
           <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             {formattedRide?.is_recurring ? (
               formattedRide.ride_days?.map((day, index) => (
@@ -986,69 +986,32 @@ const RideDetails = () => {
                   <Text className="text-orange-800 font-CairoMedium text-sm">{day}</Text>
                 </View>
               ))
-            ) : (
-              <View className="bg-orange-100 px-3 py-1 rounded-full mr-2 mb-2">
-                <Text className="text-orange-800 font-CairoMedium text-sm">
-                  {(() => {
-                    const date = parse(formattedRide?.formattedDateTime?.date || '', 'dd/MM/yyyy', new Date());
-                    const days = language === 'ar' 
-                      ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
-                      : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    return days[date.getDay()];
-                  })()}
-                </Text>
-              </View>
-            )}
+            ) : null}
           </View>
         </View>
 
-        <View className="mt-4">
-          <Text className={`text-lg font-CairoBold mb-4 text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'تفضيلات الرحلة' : 'Ride Preferences'}
-          </Text>
-          <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-            <View className="w-1/2 flex-row items-center mb-4">
-              <MaterialIcons
-                name={formattedRide?.no_smoking ? 'smoke-free' : 'smoking-rooms'}
-                size={24}
-                color="#000"
-                className={language === 'ar' ? 'ml-3' : 'mr-3'}
+        <View className="mt-0">
+          <View className={`flex-row items-center justify-between mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className={`flex-row items-center px-3 py-2 rounded-lg ${
+              formattedRide?.required_gender === 'ذكر' 
+                ? 'bg-blue-50 border border-blue-200' 
+                : formattedRide?.required_gender === 'أنثى'
+                ? 'bg-pink-50 border border-pink-200'
+                : 'bg-gray-50 border border-gray-200'
+            }`}>
+              <MaterialIcons 
+                name={formattedRide?.required_gender === 'ذكر' ? 'male' : formattedRide?.required_gender === 'أنثى' ? 'female' : 'people'} 
+                size={20} 
+                color={formattedRide?.required_gender === 'ذكر' ? '#2563EB' : formattedRide?.required_gender === 'أنثى' ? '#DB2777' : '#6B7280'} 
+                className={language === 'ar' ? 'ml-2' : 'mr-2'} 
               />
-              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
-                {formattedRide?.no_smoking 
-                  ? (language === 'ar' ? 'ممنوع التدخين' : 'No smoking')
-                  : (language === 'ar' ? 'مسموح التدخين' : 'Smoking allowed')}
-              </Text>
-            </View>
-            <View className="w-1/2 flex-row items-center mb-4">
-              <MaterialIcons
-                name={formattedRide?.no_music ? 'music-off' : 'music-note'}
-                size={24}
-                color="#000"
-                className={language === 'ar' ? 'ml-3' : 'mr-3'}
-              />
-              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
-                {formattedRide?.no_music 
-                  ? (language === 'ar' ? 'ممنوع الموسيقى' : 'No music')
-                  : (language === 'ar' ? 'مسموح الموسيقى' : 'Music allowed')}
-              </Text>
-            </View>
-            <View className="w-1/2 flex-row items-center mb-4">
-              <MaterialIcons
-                name={formattedRide?.no_children ? 'child-care' : 'child-friendly'}
-                size={24}
-                color="#000"
-                className={language === 'ar' ? 'ml-3' : 'mr-3'}
-              />
-              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
-                {formattedRide?.no_children 
-                  ? (language === 'ar' ? 'ممنوع الأطفال' : 'No children')
-                  : (language === 'ar' ? 'مسموح الأطفال' : 'Children allowed')}
-              </Text>
-            </View>
-            <View className="w-1/2 flex-row items-center mb-4">
-              <MaterialIcons name="wc" size={24} color="#000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
-              <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+              <Text className={`font-CairoBold mt-2 text-sm ${
+                formattedRide?.required_gender === 'ذكر' 
+                  ? 'text-blue-600' 
+                  : formattedRide?.required_gender === 'أنثى'
+                  ? 'text-pink-600'
+                  : 'text-gray-600'
+              }`}>
                 {formattedRide?.required_gender === 'ذكر' 
                   ? (language === 'ar' ? 'ذكور فقط' : 'Males only')
                   : formattedRide?.required_gender === 'أنثى'
@@ -1056,6 +1019,75 @@ const RideDetails = () => {
                   : (language === 'ar' ? 'جميع الجنسيات' : 'All genders')}
               </Text>
             </View>
+
+            <View className={`flex-row items-center px-3 py-2 rounded-lg bg-orange-50 border border-orange-200 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <MaterialIcons 
+                name="event" 
+                size={20} 
+                color="#F97316" 
+                className={language === 'ar' ? 'ml-2' : 'mr-2'} 
+              />
+              <Text className="font-CairoBold mt-2 text-sm text-orange-600">
+                {formattedRide?.is_recurring ? (
+                  formattedRide.ride_days?.map((day, index) => (
+                    `${day}${index < (formattedRide.ride_days?.length || 0) - 1 ? '، ' : ''}`
+                  ))
+                ) : (
+                  (() => {
+                    const date = parse(formattedRide?.formattedDateTime?.date || '', 'dd/MM/yyyy', new Date());
+                    const days = language === 'ar' 
+                      ? ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+                      : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    return days[date.getDay()];
+                  })()
+                )}
+              </Text>
+            </View>
+          </View>
+
+          <Text className={`text-lg font-CairoBold mt-2 mb-4 text-black ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'تفضيلات الرحلة' : 'Ride Preferences'}
+          </Text>
+          <View className={`flex-row flex-wrap gap-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            {formattedRide?.no_smoking && (
+              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-red-50 border border-red-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <MaterialIcons
+                  name="smoke-free"
+                  size={22}
+                  color="#DC2626"
+                  className={language === 'ar' ? 'ml-3' : 'mr-3'}
+                />
+                <Text className={`text-red-600 font-CairoBold pt-1.5 text-sm ${language === 'ar' ? 'ml-2 pr-1' : 'mr-2 pl-1'}`}>
+                  {language === 'ar' ? 'ممنوع التدخين' : 'No smoking'}
+                </Text>
+              </View>
+            )}
+            {formattedRide?.no_music && (
+              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-purple-50 border border-purple-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <MaterialIcons
+                  name="music-off"
+                  size={22}
+                  color="#7C3AED"
+                  className={language === 'ar' ? 'ml-3' : 'mr-3'}
+                />
+                <Text className={`text-purple-600 font-CairoBold text-sm ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                  {language === 'ar' ? 'ممنوع الموسيقى' : 'No music'}
+                </Text>
+              </View>
+            )}
+            {formattedRide?.no_children && (
+              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <MaterialIcons
+                  name="child-care"
+                  size={22}
+                  color="#D97706"
+                  className={language === 'ar' ? 'ml-3' : 'mr-3'}
+                />
+                <Text className={`text-yellow-600 font-CairoBold text-sm ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                  {language === 'ar' ? 'ممنوع الأطفال' : 'No children'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -1912,7 +1944,7 @@ const RideDetails = () => {
 
   return (
     <RideLayout
-      title="تفاصيل الرحلة"
+      title={language === 'ar' ? 'تفاصيل الرحلة' : 'Ride Details'}
       origin={ride ? { latitude: ride.origin_latitude, longitude: ride.origin_longitude } : undefined}
       destination={ride ? { latitude: ride.destination_latitude, longitude: ride.destination_longitude } : undefined}
       waypoints={ride?.waypoints}
