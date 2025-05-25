@@ -32,6 +32,7 @@ const RootLayout = () => {
                <Stack.Screen name="track-user/[id]" options={{ headerShown: false }} />
                <Stack.Screen name="my-shares" options={{ headerShown: false }} />
                <Stack.Screen name="track-requests" options={{ headerShown: false }} />
+               <Stack.Screen name='all-rides' options={{ headerShown: false }} />
 
 
 

@@ -978,7 +978,7 @@ const RideDetails = () => {
           </View>
         </View>
 
-        <View className="mb-1">
+        {/* <View className="mb-1">
           <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             {formattedRide?.is_recurring ? (
               formattedRide.ride_days?.map((day, index) => (
@@ -988,7 +988,7 @@ const RideDetails = () => {
               ))
             ) : null}
           </View>
-        </View>
+        </View> */}
 
         <View className="mt-0">
           <View className={`flex-row items-center justify-between mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -1063,27 +1063,27 @@ const RideDetails = () => {
               </View>
             )}
             {formattedRide?.no_music && (
-              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-purple-50 border border-purple-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-red-50 border border-red-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <MaterialIcons
                   name="music-off"
                   size={22}
-                  color="#7C3AED"
+                  color="#DC2626"
                   className={language === 'ar' ? 'ml-3' : 'mr-3'}
                 />
-                <Text className={`text-purple-600 font-CairoBold text-sm ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                <Text className={`text-red-600 font-CairoBold pt-1.5 text-sm ${language === 'ar' ? 'ml-2 pr-1' : 'mr-2 pl-1'}`}>
                   {language === 'ar' ? 'ممنوع الموسيقى' : 'No music'}
                 </Text>
               </View>
             )}
             {formattedRide?.no_children && (
-              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className={`flex-1 min-w-[140px] flex-row items-center px-4 py-3 rounded-xl bg-red-50 border border-red-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <MaterialIcons
                   name="child-care"
                   size={22}
-                  color="#D97706"
+                  color="#DC2626"
                   className={language === 'ar' ? 'ml-3' : 'mr-3'}
                 />
-                <Text className={`text-yellow-600 font-CairoBold text-sm ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
+                <Text className={`text-red-600 font-CairoBold pt-1.5 text-sm ${language === 'ar' ? 'ml-2 pr-1' : 'mr-2 pl-1'}`}>
                   {language === 'ar' ? 'ممنوع الأطفال' : 'No children'}
                 </Text>
               </View>

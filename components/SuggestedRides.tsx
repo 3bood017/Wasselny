@@ -81,9 +81,24 @@ const DEFAULT_DRIVER_NAME = 'Unknown Driver';
 const DEFAULT_CAR_SEATS = 4;
 const DEFAULT_CAR_TYPE = 'Unknown';
 const MAX_RIDES = 5;
-const MAX_DISTANCE_KM = 20;
+const MAX_DISTANCE_KM = 10;
+const TIME_WINDOW_HOURS = 24;
+const PREFERRED_ROUTE_WEIGHT = 100;
+const DISTANCE_WEIGHT = 50;
+const RECURRING_WEIGHT = 30;
+const TIME_MATCH_WEIGHT = 20;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const VALID_RECURRING_STATUSES = ['available', 'full', 'in-progress', 'completed', 'on-hold'];
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+const DAY_TRANSLATIONS: { [key in typeof DAYS[number]]: string } = {
+  'Sunday': 'الأحد',
+  'Monday': 'الإثنين',
+  'Tuesday': 'الثلاثاء',
+  'Wednesday': 'الأربعاء',
+  'Thursday': 'الخميس',
+  'Friday': 'الجمعة',
+  'Saturday': 'السبت'
+};
 
 // Haversine formula to calculate distance
 const calculateDistance = (
@@ -133,6 +148,31 @@ const clearCache = async (userId: string) => {
     await AsyncStorage.removeItem(`suggested_rides_${userId}`);
   } catch (err) {
     console.error('Error clearing cache:', err);
+  }
+};
+
+const getDayOfWeek = (dateStr: string, lang: string): string => {
+  try {
+    if (!dateStr) return 'Unknown Day';
+    
+    // Parse DD/MM/YYYY format
+    const [datePart, timePart] = dateStr.split(' ');
+    const [dayStr, monthStr, yearStr] = datePart.split('/');
+    
+    // Create date in YYYY-MM-DD format
+    const date = new Date(`${yearStr}-${monthStr}-${dayStr} ${timePart || ''}`);
+    
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date for day of week:', dateStr);
+      return 'Unknown Day';
+    }
+    
+    const dayIndex = date.getDay();
+    const dayName = DAYS[dayIndex];
+    return lang === 'ar' ? DAY_TRANSLATIONS[dayName as keyof typeof DAY_TRANSLATIONS] : dayName;
+  } catch (error) {
+    console.error('Error getting day of week:', error);
+    return 'Unknown Day';
   }
 };
 
@@ -252,7 +292,7 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
   }, []);
 
   // Fetch suggested rides
-  const fetchRides = useMemo(() => async () => {
+  const fetchRides = useCallback(async () => {
     if (!user?.id) {
       setError(language === 'ar' ? 'المستخدم غير مصادق' : 'User not authenticated');
       setLoading(false);
@@ -264,7 +304,6 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
       return;
     }
 
-    console.log('Fetching rides');
     try {
       setLoading(true);
       setError(null);
@@ -273,7 +312,6 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
       if (!hasFetchedRef.current) {
         const cachedRides = await getCachedSuggestedRides(user.id);
         if (cachedRides?.length && isMountedRef.current) {
-          console.log('Using cached rides:', cachedRides.length);
           setRides(cachedRides.slice(0, MAX_RIDES));
           setLoading(false);
           hasFetchedRef.current = true;
@@ -282,30 +320,12 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
         await clearCache(user.id);
       }
 
-      // Fetch user location
-      if (!userLocation && isMountedRef.current) {
-        const loc = await fetchUserLocation();
-        if (isMountedRef.current) {
-          setUserLocation(loc);
-          console.log('User location:', loc);
-        }
-      }
-
-      // Fetch preferred locations
-      if (preferredLocations.length === 0 && isMountedRef.current) {
-        const pastRides = await fetchPastRides();
-        if (isMountedRef.current) {
-          const prefs = getPreferredLocations(pastRides);
-          setPreferredLocations(prefs);
-        }
-      }
-
-      // Fetch rides (recurring or future)
+      // Fetch rides
       const ridesRef = collection(db, 'rides');
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Future rides query (non-recurring, available, future)
+      // Future rides query
       const futureRidesQuery = query(
         ridesRef,
         where('ride_datetime', '>=', today.toISOString()),
@@ -316,9 +336,8 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
 
       const futureRidesSnapshot = await getDocs(futureRidesQuery);
       let ridesData = futureRidesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RideData));
-      console.log('Future rides fetched:', ridesData.length, 'Data:', JSON.stringify(ridesData, null, 2));
 
-      // Recurring rides query (any valid status)
+      // Recurring rides query
       const recurringQuery = query(
         ridesRef,
         where('recurring', '==', true),
@@ -327,7 +346,6 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
       );
       const recurringSnapshot = await getDocs(recurringQuery);
       const recurringRidesData = recurringSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RideData));
-      console.log('Recurring rides fetched:', recurringRidesData.length, 'Data:', JSON.stringify(recurringRidesData, null, 2));
 
       ridesData = [
         ...ridesData,
@@ -336,9 +354,8 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
         index === self.findIndex(r => r.id === ride.id)
       );
 
-      // Fallback query for any available rides
+      // Fallback query
       if (ridesData.length === 0 && isMountedRef.current) {
-        console.log('No future or recurring rides found, trying fallback query');
         const fallbackQuery = query(
           ridesRef,
           where('status', '==', 'available'),
@@ -346,11 +363,10 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
         );
         const fallbackSnapshot = await getDocs(fallbackQuery);
         ridesData = fallbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RideData));
-        console.log('Fallback rides fetched:', ridesData.length, 'Data:', JSON.stringify(ridesData, null, 2));
       }
 
       if (ridesData.length === 0) {
-        setError(language === 'ar' ? 'لا توجد رحلات متاحة أو متكررة. تحقق من بيانات Firestore (الحالة، التكرار، أو التاريخ).' : 'No available or recurring rides. Check Firestore data (status, recurring, or datetime).');
+        setError(language === 'ar' ? 'لا توجد رحلات متاحة' : 'No rides available');
         setRides([]);
         return;
       }
@@ -389,38 +405,10 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
         })
         .sort((a, b) => (b.priority || 0) - (a.priority || 0));
 
-      // Select top 5 rides
+      // Select top rides
       let finalRides = suggestedRides.slice(0, MAX_RIDES);
 
-      // If fewer than 5 rides, fetch random rides
-      if (finalRides.length < MAX_RIDES && isMountedRef.current) {
-        const remaining = MAX_RIDES - finalRides.length;
-        const randomQuery = query(
-          ridesRef,
-          where('status', '==', 'available'),
-          limit(remaining)
-        );
-        const randomSnapshot = await getDocs(randomQuery);
-        const randomRidesData = randomSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as RideData))
-          .filter(ride => !finalRides.some(r => r.id === ride.id));
-        console.log('Random rides fetched:', randomRidesData.length, 'Data:', JSON.stringify(randomRidesData, null, 2));
-        const randomRidesWithDriver = await getRidesWithDriverData(randomRidesData);
-        const randomRides = randomRidesWithDriver.map(ride => ({
-          ...ride,
-          distance: userLocation ? calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            ride.origin_latitude,
-            ride.origin_longitude
-          ) : undefined,
-          priority: 0,
-        }));
-        finalRides = [...finalRides, ...randomRides].slice(0, MAX_RIDES);
-      }
-
       if (isMountedRef.current) {
-        console.log('Final rides:', finalRides.length, 'Data:', JSON.stringify(finalRides, null, 2));
         setRides(finalRides);
         if (finalRides.length) {
           await cacheSuggestedRides(user.id, finalRides);
@@ -429,7 +417,7 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
     } catch (err) {
       console.error('Error fetching rides:', err);
       if (isMountedRef.current) {
-        setError(language === 'ar' ? 'فشل في تحميل الرحلات. تحقق من الاتصال وFirestore.' : 'Failed to load rides. Check connection and Firestore.');
+        setError(language === 'ar' ? 'فشل في تحميل الرحلات' : 'Failed to load rides');
       }
     } finally {
       if (isMountedRef.current) {
@@ -437,7 +425,7 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
         hasFetchedRef.current = true;
       }
     }
-  }, [user?.id, userLocation, preferredLocations, language, t]);
+  }, [user?.id, userLocation, preferredLocations, language, isMountedRef, MAX_RIDES, MAX_DISTANCE_KM, VALID_RECURRING_STATUSES]);
 
   const getRidesWithDriverData = async (rides: RideData[]): Promise<Ride[]> => {
     const driverIds = new Set(rides
@@ -486,17 +474,18 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
   };
 
   useEffect(() => {
-    console.log('useEffect running, hasFetched:', hasFetchedRef.current);
-    if ((!hasFetchedRef.current || refreshKey !== undefined) && isMountedRef.current) {
+    console.log('useEffect running, refreshKey:', refreshKey);
+    if (isMountedRef.current) {
       hasFetchedRef.current = false;
       fetchRides();
     }
-  }, [fetchRides, refreshKey]);
+  }, [refreshKey, fetchRides]);
 
   const renderRideCard = useMemo(() => {
     return ({ item }: { item: Ride }) => {
       const [date, time] = item.ride_datetime.split(' ') || ['Unknown Date', 'Unknown Time'];
       const formattedTime = time.includes(':') ? formatTimeTo12Hour(time) : time;
+      const dayOfWeek = getDayOfWeek(item.ride_datetime, language);
 
       return (
         <TouchableOpacity
@@ -540,7 +529,7 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
               </View>
               {item.waypoints && item.waypoints.length > 0 && item.waypoints.map((waypoint, index) => (
                 <View key={index} className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <Image source={icons.point} className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+                  <Image source={icons.map} tintColor={"#F79824"} className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
                   <Text className={`text-sm text-gray-500 ${language === 'ar' ? ' font-CairoBold ml-2' : 'mr-2'}`}>
                     {language === 'ar' ? 'محطة' : 'Stop'} {index + 1}:
                   </Text>
@@ -564,30 +553,12 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
           <View className={`flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
               <Image source={icons.calendar} className={`w-4 h-4 mb-1 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-              <View >
+              <View>
                 <Text className={`text-sm pt-5 text-gray-600 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  {date}
+                  {dayOfWeek}
                 </Text>
-                <Text className={`text-sm mt-1 font-CairoBold text-red-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  {item.ride_days && item.ride_days.length > 0 ? 
-                    item.ride_days.map(day => {
-                      const dayTranslations: { [key: string]: string } = {
-                        'Monday': 'الإثنين',
-                        'Tuesday': 'الثلاثاء',
-                        'Wednesday': 'الأربعاء',
-                        'Thursday': 'الخميس',
-                        'Friday': 'الجمعة',
-                        'Saturday': 'السبت',
-                        'Sunday': 'الأحد'
-                      };
-                      return dayTranslations[day] || day;
-                    }).join('، ') :
-                    (() => {
-                      const rideDate = new Date(item.ride_datetime);
-                      const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-                      return days[rideDate.getDay()];
-                    })()
-                  }
+                <Text className={`text-sm mt-1 font-Bold text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {date}
                 </Text>
               </View>
             </View>
@@ -631,14 +602,24 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
   return (
     <View>
       {rides.length > 0 ? (
-        <FlatList
-          data={rides}
-          renderItem={renderRideCard}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 16 }}
-          extraData={language}
-        />
+        <>
+          <FlatList
+            data={rides}
+            renderItem={renderRideCard}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ padding: 16 }}
+            extraData={language}
+          />
+          <TouchableOpacity 
+            onPress={() => router.push('/all-rides')}
+            className="mx-4 mb-4 p-3 bg-blue-500 rounded-lg"
+          >
+            <Text className="text-white text-center font-CairoBold">
+              {language === 'ar' ? 'عرض جميع الرحلات' : 'Show All Rides'}
+            </Text>
+          </TouchableOpacity>
+        </>
       ) : (
         <View className="items-center justify-center py-8">
           <Image source={images.noResult} className="w-40 h-40" resizeMode="contain" />

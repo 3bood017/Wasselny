@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Map from "@/components/Map";
 import RideCard from "@/components/RideCard";
 import SuggestedRides from "@/components/SuggestedRides";
+import SuggestedRidesGrid from "@/components/SuggestedRidesGrid";
 import { icons, images } from '@/constants';
 import { useNotifications } from '@/context/NotificationContext';
 import { useLocationStore } from "@/store";
@@ -140,6 +141,7 @@ export default function Home() {
       console.log('Screen focused, checking driver status');
       if (user?.id) {
         checkIfUserIsDriver();
+        setRefreshKey(prev => prev + 1);
       }
     }, [user?.id])
   );
@@ -282,6 +284,7 @@ export default function Home() {
       if (isDriver && user?.id) {
         await fetchInProgressRides();
       }
+      setRefreshKey(prev => prev + 1);
     } catch (err) {
       console.error("Refresh failed:", err);
     } finally {
@@ -332,6 +335,13 @@ export default function Home() {
                 </Text>
               </View>
             </TouchableOpacity>
+
+            <View className="mt-4">
+              <Text className={`text-xl ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} mb-2 px-4`}>
+                {language === 'ar' ? 'الرحلات المقترحة' : 'Suggested Rides'}
+              </Text>
+              <SuggestedRidesGrid refreshKey={refreshKey} />
+            </View>
 
             <View 
               className="mx-2 mt-5"
