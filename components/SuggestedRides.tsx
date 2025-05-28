@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, FlatList, Platform, Animated } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
+import { View, Text, Image, TouchableOpacity, FlatList, Platform, Animated, ActivityIndicator } from 'react-native';
 import { useUser } from '@clerk/clerk-expo';
-import { router } from 'expo-router';
+import { router, useRouter } from 'expo-router';
 import { collection, query, getDocs, doc, getDoc, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { icons, images } from '@/constants';
 import { StyleSheet } from 'react-native';
 import { useLanguage } from '@/context/LanguageContext';
 import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
 
 // Updated Interfaces to match Firebase schema
 interface DriverData {
@@ -243,7 +244,14 @@ const RideSkeleton = () => {
   );
 };
 
-const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
+interface SuggestedRidesProps {}
+
+export interface SuggestedRidesRef {
+  refresh: () => Promise<void>;
+}
+
+const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProps>((props, ref) => {
+  const router = useRouter();
   const { language, t } = useLanguage();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
@@ -489,7 +497,13 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
 
   useEffect(() => {
     fetchRides();
-  }, [refreshKey, fetchRides]);
+  }, [fetchRides]);
+
+  useImperativeHandle(ref, () => ({
+    refresh: async () => {
+      await fetchRides();
+    }
+  }));
 
   const renderRideCard = ({ item }: { item: Ride }) => {
     const [date, time] = item.ride_datetime.split(' ') || ['Unknown Date', 'Unknown Time'];
@@ -503,9 +517,9 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
         style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
       >
         <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'}`}>
-          <View className="px-2 py-1 rounded-full bg-green-50">
-            <Text className="text-xs font-CairoMedium text-green-600">
-              {language === 'ar' ? 'متاح' : t.available}
+          <View className={`px-2 py-1 rounded-full ${item.is_recurring ? 'bg-orange-50' : 'bg-green-50'}`}>
+            <Text className={`text-xs font-CairoMedium ${item.is_recurring ? 'text-orange-400' : 'text-green-600'}`}>
+              {item.is_recurring ? (language === 'ar' ? 'متكرر' : 'Recurring') : (language === 'ar' ? 'متاح' : 'Available')}
             </Text>
           </View>
         </View>
@@ -582,60 +596,56 @@ const SuggestedRides = ({ refreshKey }: { refreshKey?: number }) => {
 
   if (loading) {
     return (
-      <View className="flex-1 px-4">
-        {[...Array(3)].map((_, index) => (
-          <RideSkeleton key={index} />
-        ))}
+      <View className="flex-1 items-center justify-center py-4">
+        <ActivityIndicator size="large" color="#F8780D" />
       </View>
     );
   }
 
   if (error) {
     return (
-      <View className="items-center justify-center py-8">
-        <Text className={`text-sm text-red-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>{error}</Text>
-        <TouchableOpacity
-          onPress={fetchRides}
-          className="mt-4"
+      <View className="flex-1 items-center justify-center py-4">
+        <Text className={`text-red-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>{error}</Text>
+        <TouchableOpacity 
+          onPress={fetchRides} 
+          className="mt-4 bg-orange-500 px-4 py-2 rounded-full"
         >
-          <Text className="text-blue-500">{language === 'ar' ? 'إعادة المحاولة' : t.retry}</Text>
+          <Text className="text-white font-CairoMedium">
+            {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+          </Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  if (rides.length === 0) {
+    return (
+      <View className="flex-1 items-center justify-center py-4">
+        <Ionicons name="search-outline" size={64} color="#9CA3AF" />
+        <Text className={`text-gray-500 text-center mt-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+          {language === 'ar' ? 'لا توجد رحلات متاحة' : 'No rides available'}
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View>
-      {rides.length > 0 ? (
-        <FlatList
-          data={rides}
-          renderItem={renderRideCard}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 16 }}
-          extraData={language}
-        />
-      ) : (
-        <View className="items-center justify-center py-8">
-          <Image source={images.noResult} className="w-40 h-40" resizeMode="contain" />
-          <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'لا توجد رحلات متاحة حاليًا' : t.noRidesAvailable}
-          </Text>
-          <TouchableOpacity
-            onPress={fetchRides}
-            className="mt-4"
-          >
-            <Text className="text-blue-500">{language === 'ar' ? 'إعادة المحاولة' : t.retry}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+    <FlatList
+      data={rides}
+      renderItem={renderRideCard}
+      keyExtractor={(item) => item.id}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ padding: 16 }}
+      extraData={language}
+    />
   );
-};
+});
+
+SuggestedRidesComponent.displayName = 'SuggestedRides';
 
 const styles = StyleSheet.create({
   androidShadow: { elevation: 5 },
   iosShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
 });
 
-export default SuggestedRides;
+export default SuggestedRidesComponent;

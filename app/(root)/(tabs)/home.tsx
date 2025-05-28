@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Map from "@/components/Map";
 import RideCard from "@/components/RideCard";
-import SuggestedRides from "@/components/SuggestedRides";
+import SuggestedRides, { SuggestedRidesRef } from "@/components/SuggestedRides";
 import SuggestedRidesGrid from "@/components/SuggestedRidesGrid";
 import { icons, images } from '@/constants';
 import { useNotifications } from '@/context/NotificationContext';
@@ -91,6 +91,9 @@ export default function Home() {
   const navigation = useNavigation<NavigationProp>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [inProgressRides, setInProgressRides] = useState<Ride[]>([]);
+  const suggestedRidesRef = useRef<SuggestedRidesRef>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(true);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -181,6 +184,7 @@ export default function Home() {
   useEffect(() => {
     const requestLocation = async () => {
       try {
+        setIsMapLoading(true);
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           setHasPermission(false);
@@ -221,6 +225,8 @@ export default function Home() {
           "Location Error",
           message
         );
+      } finally {
+        setIsMapLoading(false);
       }
     };
     requestLocation();
@@ -265,9 +271,11 @@ export default function Home() {
     }, [isDriver, user?.id])
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    setIsMapLoading(true);
     try {
+      // Update location
       const location = await Location.getCurrentPositionAsync({
         accuracy: Platform.OS === 'android' ? Location.Accuracy.Balanced : Location.Accuracy.High,
       });
@@ -280,17 +288,35 @@ export default function Home() {
       
       setUserLocation(newLocation);
       await AsyncStorage.setItem('userLocation', JSON.stringify(newLocation));
-      
+
+      // Refresh driver status
+      if (user?.id) {
+        await checkIfUserIsDriver();
+      }
+
+      // Refresh in-progress rides if user is a driver
       if (isDriver && user?.id) {
         await fetchInProgressRides();
       }
+
+      // Refresh suggested rides
+      if (suggestedRidesRef.current) {
+        await suggestedRidesRef.current.refresh();
+      }
+
+      // Trigger a re-render of the map
       setRefreshKey(prev => prev + 1);
     } catch (err) {
       console.error("Refresh failed:", err);
+      Alert.alert(
+        t.error,
+        language === 'ar' ? 'حدث خطأ أثناء تحديث البيانات' : 'An error occurred while refreshing data'
+      );
     } finally {
-      setRefreshing(false);
+      setIsRefreshing(false);
+      setIsMapLoading(false);
     }
-  };
+  }, [user?.id, isDriver, t, language]);
 
   return (
     <SafeAreaView className="bg-general-500 flex-1">
@@ -373,7 +399,13 @@ export default function Home() {
                 {t.currentLocation}
               </Text>
               <View className="flex flex-row items-center px-2 bg-transparent h-[300px]">
-                <Map/> 
+                {isMapLoading ? (
+                  <View className="flex-1 h-full bg-gray-100 rounded-xl items-center justify-center">
+                    <ActivityIndicator size="large" color="#F87000" />
+                  </View>
+                ) : (
+                  <Map key={refreshKey} />
+                )}
               </View>
             </>
 
@@ -489,26 +521,25 @@ export default function Home() {
                     router.push('/(root)/all-rides');
                   }}
                   className="flex-row items-center px-1 py-1 rounded-[15px]"
-                  
                 >
                   <Text className="font-CairoSemiBold">
-              {language === 'ar' ? 'عرض الكل' : 'View All'}
-            </Text>
-
-                  {/* <Text className="font-CairoSemiBold">View All </Text> */}
+                    {language === 'ar' ? 'عرض الكل' : 'View All'}
+                  </Text>
                 </TouchableOpacity>}
               </View>
             </View>
-            <SuggestedRides key={refreshKey} refreshKey={refreshKey} />
+            <SuggestedRides ref={suggestedRidesRef} />
           </>
         }
         refreshControl={
           <RefreshControl 
-            refreshing={refreshing} 
+            refreshing={isRefreshing} 
             onRefresh={onRefresh}
-            colors={["#F87000", "#F87000"]}
-            tintColor="#000"
-            className="z-10"
+            colors={["#F87000"]}
+            tintColor="#F87000"
+            title={language === 'ar' ? 'جاري التحديث...' : 'Refreshing...'}
+            titleColor="#F87000"
+            progressViewOffset={20}
           />
         }
       />

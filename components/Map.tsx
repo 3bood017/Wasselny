@@ -1,29 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Text, View, Platform, Image } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import { ActivityIndicator, Text, View, Platform, Image, TouchableOpacity, StyleSheet } from "react-native";
+import MapView, { PROVIDER_DEFAULT, Marker, Circle, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
+import * as Haptics from 'expo-haptics';
 
 import { icons } from "@/constants";
-import { useFetch } from "@/lib/fetch";
-import { useDriverStore, useLocationStore } from "@/store";
-import {
-  calculateDriverTimes,
-  calculateRegion,
-  generateMarkersFromData,
-} from "@/lib/map";
-import { Driver, MarkerData } from "@/types/type";
-import { TouchableOpacity } from "react-native";
+import { useLocationStore } from "@/store";
+import { calculateRegion } from "@/lib/map";
+import { useLanguage } from "@/context/LanguageContext";
 
 const directionsAPI = process.env.EXPO_PUBLIC_DIRECTIONS_API_KEY;
 
 interface MapProps {
   showUserLocation?: boolean;
-  showDriverLocation?: boolean;
-  driverLocation?: {
-    latitude: number;
-    longitude: number;
-  };
   origin?: {
     latitude: number;
     longitude: number;
@@ -32,16 +22,15 @@ interface MapProps {
     latitude: number;
     longitude: number;
   };
+  isLocationEnabled?: boolean;
 }
 
 const Map = ({
   showUserLocation = false,
-  showDriverLocation = false,
-  driverLocation,
   origin,
   destination,
+  isLocationEnabled = true,
 }: MapProps) => {
-  const { data: drivers, loading, error } = useFetch<Driver[]>("/(api)/driver");
   const {
     userLongitude,
     userLatitude,
@@ -49,168 +38,154 @@ const Map = ({
     destinationLongitude,
   } = useLocationStore();
   const mapRef = useRef<MapView | null>(null);
-  const { selectedDriver, setDrivers } = useDriverStore();
+  const { language } = useLanguage();
 
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<any>(null);
-  const [markers, setMarkers] = useState<MarkerData[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<any>({
+    latitude: 31.9522,  // Palestine center latitude
+    longitude: 35.2332, // Palestine center longitude
+    latitudeDelta: 0.01,   // Start zoomed in
+    longitudeDelta: 0.01,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFollowingUser, setIsFollowingUser] = useState(true);
 
-  // Load driver information and convert to map markers
-  useEffect(() => {
-    if (Array.isArray(drivers) && userLatitude && userLongitude) {
-      const newMarkers = generateMarkersFromData({
-        data: drivers,
-        userLatitude,
-        userLongitude,
-      });
-      setMarkers(newMarkers);
-    }
-  }, [drivers, userLatitude, userLongitude]);
-
-  // Calculate arrival time for each driver
-  useEffect(() => {
-    if (
-      markers.length > 0 &&
-      destinationLatitude &&
-      destinationLongitude
-    ) {
-      calculateDriverTimes({
-        markers,
-        userLatitude,
-        userLongitude,
-        destinationLatitude,
-        destinationLongitude,
-      }).then((updatedDrivers) => {
-        setDrivers(updatedDrivers as MarkerData[]);
-      });
-    }
-  }, [markers, destinationLatitude, destinationLongitude]);
-
-  // Get current user location
+  // Get current user location with optimized settings
   useEffect(() => {
     const getLocation = async () => {
       try {
+        setIsLoading(true);
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          const location = await Location.getCurrentPositionAsync({});
-          setUserLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
+        if (status === "granted" && isLocationEnabled) {
+          // Use lower accuracy for faster initial load
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low,
+            timeInterval: 5000,
+            distanceInterval: 10,
           });
 
-          setCurrentLocation({
+          const newLocation = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-            latitudeDelta: 0.0922,
-            longitudeDelta: 0.0421,
+          };
+          
+          setUserLocation(newLocation);
+          // Set initial zoomed in view of user location
+          setCurrentLocation({
+            latitude: newLocation.latitude,
+            longitude: newLocation.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
           });
+
+          // Update to higher accuracy after initial load
+          const watchLocation = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.Balanced,
+              timeInterval: 5000,
+              distanceInterval: 10,
+            },
+            (newLocation) => {
+              if (isLocationEnabled) {
+                setUserLocation({
+                  latitude: newLocation.coords.latitude,
+                  longitude: newLocation.coords.longitude,
+                });
+              }
+            }
+          );
+
+          return () => {
+            watchLocation.remove();
+          };
+        } else {
+          setUserLocation(null);
         }
       } catch (error) {
         console.error("Error getting location: ", error);
+        setUserLocation(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     getLocation();
-  }, []);
+  }, [isLocationEnabled]);
 
-  // Loading or error states
-  if (loading || !userLatitude || !userLongitude) {
-    return (
-      <View className="flex items-center justify-center w-full h-full">
-        <ActivityIndicator size="small" color="#000" />
-      </View>
-    );
-  }
+  const handleCurrentLocationPress = async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setIsFollowingUser(true);
+      
+      if (userLocation) {
+        mapRef.current?.animateToRegion({
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        });
+      }
+    } catch (error) {
+      console.error("Error centering on user location:", error);
+    }
+  };
 
-  if (error) {
-    return (
-      <View className="flex justify-center items-center w-full h-full">
-        <Text>Error: {error}</Text>
-      </View>
-    );
-  }
+  const handleMapPress = () => {
+    setIsFollowingUser(false);
+  };
 
-  if (!userLocation || !currentLocation) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
+  // Update map region when user location changes
+  useEffect(() => {
+    if (userLocation && isFollowingUser) {
+      mapRef.current?.animateToRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      });
+    }
+  }, [userLocation, isFollowingUser]);
 
-  const region = calculateRegion({
-    userLatitude,
-    userLongitude,
-    destinationLatitude,
-    destinationLongitude,
-  });
-
+  // Show map immediately with loading overlay
   return (
     <View className="w-full h-full">
       <MapView
-        provider={PROVIDER_DEFAULT}
+        provider={PROVIDER_GOOGLE}
         ref={mapRef}
         className="w-full h-full rounded-2xl"
         mapType={Platform.OS === "android" ? "standard" : "mutedStandard"}
         showsPointsOfInterest={true}
         initialRegion={currentLocation}
-        showsUserLocation={showUserLocation}
-        showsMyLocationButton={true}
-        followsUserLocation={true}
+        showsUserLocation={true}
+        showsMyLocationButton={false}
+        followsUserLocation={isFollowingUser}
         zoomEnabled={true}
         loadingEnabled={true}
         loadingIndicatorColor="#F97316"
         loadingBackgroundColor="#FFFFFF"
-        moveOnMarkerPress={false}
-        minZoomLevel={10}
+        minZoomLevel={5}
+        maxZoomLevel={20}
+        onPress={handleMapPress}
+        customMapStyle={[
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }],
+          },
+        ]}
       >
-        {/* Drivers */}
-        {!showDriverLocation && markers.map((marker) => (
-          <Marker
-            key={marker.id}
-            coordinate={{
-              latitude: marker.latitude,
-              longitude: marker.longitude,
-            }}
-            title={marker.title}
-            image={selectedDriver === marker.id ? icons.selectedMarker : icons.marker}
-          />
-        ))}
 
-        {/* Driver Location for Tracking */}
-        {showDriverLocation && driverLocation && (
-          <Marker
-            coordinate={{
-              latitude: driverLocation.latitude,
-              longitude: driverLocation.longitude,
-            }}
-            title="Driver Location"
-            image={icons.marker}
-          />
-        )}
 
-        {/* Origin and Destination */}
-        {origin && (
-          <Marker
-            coordinate={{
-              latitude: origin.latitude,
-              longitude: origin.longitude,
-            }}
-            title="Origin"
-            image={icons.pin}
+        {/* 1km Radius Circle
+        {userLocation && (
+          <Circle
+            center={userLocation}
+            radius={1000}
+            strokeColor="#F97316"
+            strokeWidth={3}
+            fillColor="rgba(249, 115, 22, 0.15)"
           />
-        )}
-
-        {destination && (
-          <Marker
-            coordinate={{
-              latitude: destination.latitude,
-              longitude: destination.longitude,
-            }}
-            title="Destination"
-            image={icons.pin}
-          />
-        )}
+        )} */}
 
         {/* Route */}
         {origin && destination && (
@@ -218,34 +193,56 @@ const Map = ({
             origin={origin}
             destination={destination}
             apikey={directionsAPI!}
-            strokeColor="#0286FF"
-            strokeWidth={2}
+            strokeColor="#F97316"
+            strokeWidth={4}
+            lineDashPattern={[1]}
           />
         )}
       </MapView>
 
-      {/* Current Location Button */}
-      {Platform.OS === 'ios' && userLocation && (
-        <TouchableOpacity
-          onPress={() => {
-            mapRef.current?.animateToRegion({
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            });
-          }}
-          className="absolute right-3 bottom-2/3 -translate-y-1/2 bg-amber-300 p-3 rounded-full shadow-md z-10"
-        >
-          <Image
-            source={icons.target}
-            style={{ width: 30, height: 30 }}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View className="absolute inset-0 bg-white/80 items-center justify-center rounded-2xl">
+          <ActivityIndicator size="large" color="#F97316" />
+          <Text className="mt-2 text-gray-600 font-JakartaMedium">
+            {language === 'ar' ? 'جاري تحميل الخريطة...' : 'Loading map...'}
+          </Text>
+        </View>
       )}
+
+      {/* Current Location Button */}
+      <TouchableOpacity
+        onPress={handleCurrentLocationPress}
+        className={`absolute right-3 bottom-2/3 -translate-y-1/2 p-3 rounded-full shadow-lg ${
+          isFollowingUser ? 'bg-orange-500' : 'bg-white'
+        }`}
+        style={styles.locationButton}
+      >
+        <Image
+          source={icons.target}
+          style={[
+            styles.locationButtonImage,
+            isFollowingUser && { tintColor: '#FFFFFF' }
+          ]}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  locationButton: {
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  locationButtonImage: {
+    width: 24,
+    height: 24,
+  },
+});
 
 export default Map;

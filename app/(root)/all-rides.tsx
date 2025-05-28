@@ -391,9 +391,10 @@ const AllRides = () => {
       }`}
     >
       <Text
-        className={`font-CairoMedium ${
+        className={`font-CairoMedium text-sm ${
           activeFilter === filter ? 'text-white' : 'text-gray-700'
         }`}
+        style={{ textAlign: language === 'ar' ? 'right' : 'left' }}
       >
         {label}
       </Text>
@@ -612,9 +613,9 @@ const AllRides = () => {
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
-          className="mb-4"
+          className="mb-0"
         >
-          <View className={`flex-row ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className="flex-row">
             {renderFilterButton(FILTERS.ALL, language === 'ar' ? 'الكل' : 'All')}
             {renderFilterButton(FILTERS.TODAY, language === 'ar' ? 'اليوم' : 'Today')}
             {renderFilterButton(FILTERS.TOMORROW, language === 'ar' ? 'غداً' : 'Tomorrow')}

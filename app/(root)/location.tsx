@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Modal, TextInput, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -32,22 +32,94 @@ export default function LocationScreen() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [locationName, setLocationName] = useState('');
   const [locationAddresses, setLocationAddresses] = useState<{[key: string]: string}>({});
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 31.9522,
+    longitude: 35.2332,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  });
 
-  // Get user's current location
-  const getCurrentLocation = async () => {
+  // Get address from coordinates with retry mechanism
+  const getAddressFromCoordinates = useCallback(async (latitude: number, longitude: number, retries = 3): Promise<string> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const result = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude
+        });
+        
+        if (result && result[0]) {
+          const address = result[0];
+          const addressParts = [
+            address.street,
+            address.district,
+            address.city,
+            address.region
+          ].filter(Boolean);
+          
+          if (addressParts.length > 0) {
+            return addressParts.join(', ');
+          }
+        }
+        
+        // If no address found, wait before retrying
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error(`Error getting address (attempt ${i + 1}):`, error);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    
+    return language === 'ar' ? 'العنوان غير متوفر' : 'Address not available';
+  }, [language]);
+
+  // Get user's current location with optimized settings
+  const getCurrentLocation = useCallback(async () => {
     setLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           language === 'ar' ? 'خطأ' : 'Error',
-          language === 'ar' ? 'لم يتم منح إذن الوصول إلى الموقع' : 'Location permission was denied'
+          language === 'ar' ? 'لم يتم منح إذن الوصول إلى الموقع' : 'Location permission was denied',
+          [
+            {
+              text: language === 'ar' ? 'إعدادات' : 'Settings',
+              onPress: () => Linking.openSettings()
+            },
+            {
+              text: language === 'ar' ? 'إلغاء' : 'Cancel',
+              style: 'cancel'
+            }
+          ]
         );
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 5000,
+        distanceInterval: 10
+      });
+      
       setCurrentLocation(location);
+      
+      // Update map region
+      setMapRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+
+      // Get address for current location
+      const address = await getAddressFromCoordinates(location.coords.latitude, location.coords.longitude);
+      console.log('Current location address:', address);
+
     } catch (error) {
       console.error('Error getting location:', error);
       Alert.alert(
@@ -57,44 +129,42 @@ export default function LocationScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [language, getAddressFromCoordinates]);
 
-  // Get address from coordinates
-  const getAddressFromCoordinates = async (latitude: number, longitude: number) => {
+  // Fetch addresses for all locations with progress tracking
+  const fetchAddresses = useCallback(async (locations: SavedLocation[]) => {
+    setLoading(true);
     try {
-      const result = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude
-      });
+      const addresses: {[key: string]: string} = {};
+      let completed = 0;
       
-      if (result && result[0]) {
-        const address = result[0];
-        return [
-          address.street,
-          address.district,
-          address.city,
-          address.region
-        ].filter(Boolean).join(', ');
+      for (const location of locations) {
+        const address = await getAddressFromCoordinates(location.latitude, location.longitude);
+        addresses[location.id] = address;
+        completed++;
+        
+        // Update loading state with progress
+        if (completed % 2 === 0) { // Update every 2 locations to avoid too many re-renders
+          setLocationAddresses(prev => ({...prev, ...addresses}));
+        }
       }
-      return '';
+      
+      // Final update with all addresses
+      setLocationAddresses(addresses);
     } catch (error) {
-      console.error('Error getting address:', error);
-      return '';
+      console.error('Error fetching addresses:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحميل العناوين' : 'Error loading addresses'
+      );
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [getAddressFromCoordinates]);
 
-  // Fetch addresses for all locations
-  const fetchAddresses = async (locations: SavedLocation[]) => {
-    const addresses: {[key: string]: string} = {};
-    for (const location of locations) {
-      const address = await getAddressFromCoordinates(location.latitude, location.longitude);
-      addresses[location.id] = address;
-    }
-    setLocationAddresses(addresses);
-  };
-
-  // Fetch saved locations
-  const fetchSavedLocations = async () => {
+  // Fetch saved locations with error handling
+  const fetchSavedLocations = useCallback(async () => {
+    setLoading(true);
     try {
       const locationsRef = collection(db, 'user_locations');
       const q = query(locationsRef, where('userId', '==', user?.id));
@@ -112,11 +182,23 @@ export default function LocationScreen() {
       }
 
       // Fetch addresses for all locations
-      fetchAddresses(locations);
+      await fetchAddresses(locations);
     } catch (error) {
       console.error('Error fetching locations:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحميل المواقع المحفوظة' : 'Error loading saved locations'
+      );
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [user?.id, fetchAddresses]);
+
+  // Initialize data
+  useEffect(() => {
+    getCurrentLocation();
+    fetchSavedLocations();
+  }, [getCurrentLocation, fetchSavedLocations]);
 
   // Save new location
   const saveNewLocation = async () => {
@@ -271,11 +353,6 @@ export default function LocationScreen() {
     return arabicPattern.test(text);
   };
 
-  useEffect(() => {
-    getCurrentLocation();
-    fetchSavedLocations();
-  }, []);
-
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView className="flex-1">
@@ -285,12 +362,8 @@ export default function LocationScreen() {
             <MapView
               provider={PROVIDER_GOOGLE}
               className="w-full h-full"
-              initialRegion={{
-                latitude: currentLocation.coords.latitude,
-                longitude: currentLocation.coords.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
-              }}
+              region={mapRegion}
+              onRegionChangeComplete={setMapRegion}
             >
               <Marker
                 coordinate={{
@@ -298,6 +371,7 @@ export default function LocationScreen() {
                   longitude: currentLocation.coords.longitude,
                 }}
                 title={language === 'ar' ? 'موقعك الحالي' : 'Your Current Location'}
+                pinColor="#f97316"
               />
               {savedLocations.map((loc) => (
                 <Marker
@@ -307,13 +381,16 @@ export default function LocationScreen() {
                     longitude: loc.longitude,
                   }}
                   title={loc.name}
-                  pinColor={loc.isDefault ? 'red' : 'blue'}
+                  pinColor={loc.isDefault ? '#ef4444' : '#3b82f6'}
                 />
               ))}
             </MapView>
           ) : (
             <View className="flex-1 justify-center items-center">
               <ActivityIndicator size="large" color="#f97316" />
+              <Text className={`text-gray-500 mt-2 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
+                {language === 'ar' ? 'جاري تحميل الخريطة...' : 'Loading map...'}
+              </Text>
             </View>
           )}
         </View>
@@ -340,49 +417,64 @@ export default function LocationScreen() {
             {language === 'ar' ? 'المواقع المحفوظة' : 'Saved Locations'}
           </Text>
           
-          {savedLocations.map((location) => {
-            const isArabicName = containsArabic(location.name);
-            return (
-              <TouchableOpacity
-                key={location.id}
-                onPress={() => setAsDefault(location)}
-                className="p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm relative"
-              >
+          {loading ? (
+            <View className="items-center justify-center py-4">
+              <ActivityIndicator size="large" color="#f97316" />
+              <Text className={`text-gray-500 mt-2 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
+                {language === 'ar' ? 'جاري تحميل العناوين...' : 'Loading addresses...'}
+              </Text>
+            </View>
+          ) : savedLocations.length === 0 ? (
+            <View className="items-center justify-center py-4">
+              <Text className={`text-gray-500 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
+                {language === 'ar' ? 'لا توجد مواقع محفوظة' : 'No saved locations'}
+              </Text>
+            </View>
+          ) : (
+            savedLocations.map((location) => {
+              const isArabicName = containsArabic(location.name);
+              return (
                 <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    confirmDelete(location);
-                  }}
-                  className={`absolute top-1.5 ${isArabicName ? 'left-1.5' : 'right-1.5'} z-10`}
+                  key={location.id}
+                  onPress={() => setAsDefault(location)}
+                  className="p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm relative"
                 >
-                  <MaterialIcons name="close" size={16} color="#ef4444" />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      confirmDelete(location);
+                    }}
+                    className={`absolute top-1.5 ${isArabicName ? 'left-1.5' : 'right-1.5'} z-10`}
+                  >
+                    <MaterialIcons name="close" size={16} color="#ef4444" />
+                  </TouchableOpacity>
 
-                <View className={`flex-row items-center justify-between ${isArabicName ? 'flex-row-reverse' : ''}`}>
-                  <View className="flex-1">
-                    <Text className={`text-base ${isArabicName ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
-                      {location.name}
-                    </Text>
-                    <Text className={`text-sm text-gray-500 mt-0.5 ${isArabicName ? 'font-Cairo text-right' : 'font-Jakarta text-left'}`}>
-                      {locationAddresses[location.id] || (language === 'ar' ? 'جاري تحميل العنوان...' : 'Loading address...')}
-                    </Text>
-                    {location.isDefault && (
-                      <Text className={`text-xs text-orange-500 mt-1 ${isArabicName ? 'text-right' : 'text-left'}`}>
-                        {language === 'ar' ? 'الموقع الافتراضي' : 'Default Location'}
+                  <View className={`flex-row items-center justify-between ${isArabicName ? 'flex-row-reverse' : ''}`}>
+                    <View className="flex-1">
+                      <Text className={`text-base ${isArabicName ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+                        {location.name}
                       </Text>
+                      <Text className={`text-sm text-gray-500 mt-0.5 ${isArabicName ? 'font-Cairo text-right' : 'font-Jakarta text-left'}`}>
+                        {locationAddresses[location.id] || (language === 'ar' ? 'جاري تحميل العنوان...' : 'Loading address...')}
+                      </Text>
+                      {location.isDefault && (
+                        <Text className={`text-xs text-orange-500 mt-1 ${isArabicName ? 'text-right' : 'text-left'}`}>
+                          {language === 'ar' ? 'الموقع الافتراضي' : 'Default Location'}
+                        </Text>
+                      )}
+                    </View>
+                    {location.isDefault ? (
+                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 items-center justify-center ${isArabicName ? 'ml-3' : 'mr-3'}`}>
+                        <View className="w-4 h-4 rounded-full bg-orange-500" />
+                      </View>
+                    ) : (
+                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 ${isArabicName ? 'ml-3' : 'mr-3'}`} />
                     )}
                   </View>
-                  {location.isDefault ? (
-                    <View className={`w-7 h-7 rounded-full border-2 border-orange-500 items-center justify-center ${isArabicName ? 'ml-3' : 'mr-3'}`}>
-                      <View className="w-4 h-4 rounded-full bg-orange-500" />
-                    </View>
-                  ) : (
-                    <View className={`w-7 h-7 rounded-full border-2 border-orange-500 ${isArabicName ? 'ml-3' : 'mr-3'}`} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
       </ScrollView>
 
@@ -425,9 +517,10 @@ export default function LocationScreen() {
               <TouchableOpacity
                 onPress={handleSaveLocation}
                 className="px-4 py-2 rounded-lg bg-orange-500"
+                disabled={loading}
               >
                 <Text className={`text-white ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-                  {language === 'ar' ? 'حفظ' : 'Save'}
+                  {loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ' : 'Save')}
                 </Text>
               </TouchableOpacity>
             </View>

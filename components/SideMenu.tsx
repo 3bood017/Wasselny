@@ -10,7 +10,7 @@ import * as Location from 'expo-location';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useLocationStore } from '@/store';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function SideMenu(props: DrawerContentComponentProps) {
@@ -20,8 +20,8 @@ export default function SideMenu(props: DrawerContentComponentProps) {
   const { user } = useUser();
   const isRTL = language === 'ar';
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-
   const [locationEnabled, setLocationEnabled] = useState(true);
+  const [savedLocations, setSavedLocations] = useState<Array<{id: string, name: string, isDefault: boolean}>>([]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -36,6 +36,18 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
           setProfileImageUrl(imageUrl);
         }
+
+        // Fetch saved locations
+        const locationsRef = collection(db, 'user_locations');
+        const q = query(locationsRef, where('userId', '==', user.id));
+        const querySnapshot = await getDocs(q);
+        
+        const locations = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Array<{id: string, name: string, isDefault: boolean}>;
+        
+        setSavedLocations(locations);
       } catch (error) {
         console.error('Error fetching user profile:', error);
       }
@@ -166,7 +178,9 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           </View>
           <View className="flex-1">
             <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.location}</Text>
-            <Text className={`text-gray-500 font-CairoRegular text-[13px] mt-0.5 ${isRTL ? 'text-right' : 'text-left'}`}>{userAddress || t.currentLocation}</Text>
+            <Text className={`text-gray-500 font-CairoRegular text-[13px] mt-0.5 ${isRTL ? 'text-right' : 'text-left'}`}>
+              {savedLocations.find(loc => loc.isDefault)?.name || userAddress || t.currentLocation}
+            </Text>
           </View>
         </TouchableOpacity>
 
