@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Platform, Image, TextInput, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Platform, Image, TextInput, ScrollView, Modal, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { collection, query, getDocs, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, where, orderBy, limit, getDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useLanguage } from '@/context/LanguageContext';
 import { StyleSheet } from 'react-native';
@@ -46,6 +46,96 @@ const SORT_OPTIONS = {
   SEATS_DESC: 'seats_desc'
 };
 
+const RideSkeleton = () => {
+  const animatedValue = new Animated.Value(0);
+  const { language } = useLanguage();
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View 
+      className="bg-white p-4 rounded-2xl mb-3"
+      style={[
+        Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow,
+        { opacity }
+      ]}
+    >
+      {/* Status badge */}
+      <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'}`}>
+        <View className="px-2 py-1 rounded-full bg-gray-100">
+          <View className="h-4 w-16 bg-gray-200 rounded-full" />
+        </View>
+      </View>
+
+      {/* Driver info skeleton */}
+      <View className={`flex-row items-center mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+        <View className={`w-10 h-10 rounded-full bg-gray-200 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
+        <View className={language === 'ar' ? 'items-end' : 'items-start'}>
+          <View className="h-5 bg-gray-200 rounded-full w-32 mb-2" />
+          <View className="h-4 bg-gray-200 rounded-full w-24" />
+        </View>
+      </View>
+
+      {/* Route info skeleton */}
+      <View className={`flex-row items-start mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+        <View className="flex-1">
+          <View className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className={`w-5 h-5 rounded-full bg-gray-200 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+            <View className={`flex-1 ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
+              <View className="h-4 bg-gray-200 rounded-full w-3/4" />
+            </View>
+          </View>
+          <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className={`w-5 h-5 rounded-full bg-gray-200 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+            <View className={`flex-1 ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
+              <View className="h-4 bg-gray-200 rounded-full w-3/4" />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Time and seats skeleton */}
+      <View className={`flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+        <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className={`w-4 h-4 rounded-full bg-gray-200 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+          <View>
+            <View className="h-4 bg-gray-200 rounded-full w-20 mb-1" />
+            <View className="h-3 bg-gray-200 rounded-full w-16" />
+          </View>
+        </View>
+        <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className={`w-4 h-4 rounded-full bg-gray-200 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+          <View className="h-4 bg-gray-200 rounded-full w-16" />
+        </View>
+        <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className={`w-4 h-4 rounded-full bg-gray-200 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+          <View className="h-4 bg-gray-200 rounded-full w-12" />
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
 const AllRides = () => {
   const router = useRouter();
   const { language } = useLanguage();
@@ -56,9 +146,9 @@ const AllRides = () => {
   const [activeFilter, setActiveFilter] = useState(FILTERS.ALL);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(SORT_OPTIONS.TIME_ASC);
-  const [showSortOptions, setShowSortOptions] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
 
-  const fetchRides = async (filter: string) => {
+  const fetchRides = (filter: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -66,112 +156,144 @@ const AllRides = () => {
       const ridesRef = collection(db, 'rides');
       const now = new Date();
       
+      // Helper function to format date as DD/MM/YYYY HH:mm
+      const formatDateForQuery = (date: Date) => {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+      };
+
+      // Helper function to parse date from DD/MM/YYYY HH:mm format
+      const parseDateFromString = (dateStr: string) => {
+        const [datePart, timePart] = dateStr.split(' ');
+        const [day, month, year] = datePart.split('/');
+        const [hours, minutes] = timePart.split(':');
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
+      };
+
+      // Helper function to get start of day
+      const getStartOfDay = (date: Date) => {
+        const newDate = new Date(date);
+        newDate.setHours(0, 0, 0, 0);
+        return newDate;
+      };
+
+      // Helper function to get end of day
+      const getEndOfDay = (date: Date) => {
+        const newDate = new Date(date);
+        newDate.setHours(23, 59, 59, 999);
+        return newDate;
+      };
+      
       let ridesQuery;
       
       switch (filter) {
         case FILTERS.TODAY:
-          const tomorrow = new Date(now);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          tomorrow.setHours(0, 0, 0, 0);
+          const todayStart = getStartOfDay(now);
+          const todayEnd = getEndOfDay(now);
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', now.toISOString()),
-            where('ride_datetime', '<', tomorrow.toISOString()),
+            where('ride_datetime', '>=', formatDateForQuery(todayStart)),
+            where('ride_datetime', '<=', formatDateForQuery(todayEnd)),
             where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
           break;
           
         case FILTERS.TOMORROW:
-          const tomorrowStart = new Date(now);
-          tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-          tomorrowStart.setHours(0, 0, 0, 0);
-          const tomorrowEnd = new Date(tomorrowStart);
-          tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+          const tomorrowStart = getStartOfDay(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+          const tomorrowEnd = getEndOfDay(new Date(now.getTime() + 24 * 60 * 60 * 1000));
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', tomorrowStart.toISOString()),
-            where('ride_datetime', '<', tomorrowEnd.toISOString()),
+            where('ride_datetime', '>=', formatDateForQuery(tomorrowStart)),
+            where('ride_datetime', '<=', formatDateForQuery(tomorrowEnd)),
             where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
           break;
 
         case FILTERS.DAY_AFTER_TOMORROW:
-          const dayAfterTomorrowStart = new Date(now);
-          dayAfterTomorrowStart.setDate(dayAfterTomorrowStart.getDate() + 2);
-          dayAfterTomorrowStart.setHours(0, 0, 0, 0);
-          const dayAfterTomorrowEnd = new Date(dayAfterTomorrowStart);
-          dayAfterTomorrowEnd.setDate(dayAfterTomorrowEnd.getDate() + 1);
+          const dayAfterTomorrowStart = getStartOfDay(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
+          const dayAfterTomorrowEnd = getEndOfDay(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', dayAfterTomorrowStart.toISOString()),
-            where('ride_datetime', '<', dayAfterTomorrowEnd.toISOString()),
+            where('ride_datetime', '>=', formatDateForQuery(dayAfterTomorrowStart)),
+            where('ride_datetime', '<=', formatDateForQuery(dayAfterTomorrowEnd)),
             where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
           break;
 
         case FILTERS.DAY_3:
-          const day3Start = new Date(now);
-          day3Start.setDate(day3Start.getDate() + 3);
-          day3Start.setHours(0, 0, 0, 0);
-          const day3End = new Date(day3Start);
-          day3End.setDate(day3End.getDate() + 1);
+          const day3Start = getStartOfDay(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000));
+          const day3End = getEndOfDay(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000));
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', day3Start.toISOString()),
-            where('ride_datetime', '<', day3End.toISOString()),
+            where('ride_datetime', '>=', formatDateForQuery(day3Start)),
+            where('ride_datetime', '<=', formatDateForQuery(day3End)),
             where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
           break;
 
         case FILTERS.DAY_4:
-          const day4Start = new Date(now);
-          day4Start.setDate(day4Start.getDate() + 4);
-          day4Start.setHours(0, 0, 0, 0);
-          const day4End = new Date(day4Start);
-          day4End.setDate(day4End.getDate() + 1);
+          const day4Start = getStartOfDay(new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000));
+          const day4End = getEndOfDay(new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000));
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', day4Start.toISOString()),
-            where('ride_datetime', '<', day4End.toISOString()),
+            where('ride_datetime', '>=', formatDateForQuery(day4Start)),
+            where('ride_datetime', '<=', formatDateForQuery(day4End)),
             where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
           break;
 
         case FILTERS.DAY_5:
-          const day5Start = new Date(now);
-          day5Start.setDate(day5Start.getDate() + 5);
-          day5Start.setHours(0, 0, 0, 0);
-          const day5End = new Date(day5Start);
-          day5End.setDate(day5End.getDate() + 1);
+          const day5Start = getStartOfDay(new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000));
+          const day5End = getEndOfDay(new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000));
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', day5Start.toISOString()),
-            where('ride_datetime', '<', day5End.toISOString()),
+            where('ride_datetime', '>=', formatDateForQuery(day5Start)),
+            where('ride_datetime', '<=', formatDateForQuery(day5End)),
             where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
           break;
         
         default: // FILTERS.ALL
+          // For ALL rides, we'll filter out past rides in the snapshot handler
           ridesQuery = query(
             ridesRef,
-            where('ride_datetime', '>=', now.toISOString()),
-            where('status', '==', 'available'),
             orderBy('ride_datetime', 'asc')
           );
+          break;
       }
 
-      const snapshot = await getDocs(ridesQuery);
-      const ridesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ride));
+      console.log('Setting up listener for rides with filter:', filter);
+
+      // Set up real-time listener
+      const unsubscribe = onSnapshot(ridesQuery, async (snapshot) => {
+        console.log('Received snapshot update with', snapshot.docs.length, 'rides');
+        
+        const ridesData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return { id: doc.id, ...data } as Ride;
+        });
+
+        // Filter out past rides for ALL filter
+        const filteredRidesData = filter === FILTERS.ALL 
+          ? ridesData.filter(ride => {
+              const rideDate = parseDateFromString(ride.ride_datetime);
+              return rideDate > now;
+            })
+          : ridesData;
 
       // Fetch driver information for each ride
       const ridesWithDriverInfo = await Promise.all(
-        ridesData.map(async (ride) => {
+          filteredRidesData.map(async (ride) => {
           if (ride.driver_id) {
             try {
               const driverDoc = await getDoc(doc(db, 'users', ride.driver_id));
@@ -193,18 +315,40 @@ const AllRides = () => {
         })
       );
 
+        console.log('Setting rides with driver info:', ridesWithDriverInfo);
       setRides(ridesWithDriverInfo);
       setFilteredRides(ridesWithDriverInfo);
+        setLoading(false);
+      }, (err) => {
+        console.error('Error in rides listener:', err);
+        setError(language === 'ar' ? 'فشل في تحميل الرحلات' : 'Failed to load rides');
+        setLoading(false);
+      });
+
+      return () => {
+        console.log('Cleaning up rides listener');
+        unsubscribe();
+      };
     } catch (err) {
-      console.error('Error fetching rides:', err);
+      console.error('Error setting up rides listener:', err);
       setError(language === 'ar' ? 'فشل في تحميل الرحلات' : 'Failed to load rides');
-    } finally {
       setLoading(false);
+      return () => {};
     }
   };
 
+  // Add a debug effect to log state changes
   useEffect(() => {
-    fetchRides(activeFilter);
+    console.log('Rides state updated:', rides.length);
+  }, [rides]);
+
+  useEffect(() => {
+    console.log('Filtered rides updated:', filteredRides.length);
+  }, [filteredRides]);
+
+  useEffect(() => {
+    const cleanup = fetchRides(activeFilter);
+    return cleanup;
   }, [activeFilter]);
 
   useEffect(() => {
@@ -260,19 +404,24 @@ const AllRides = () => {
     <TouchableOpacity
       onPress={() => {
         setSortBy(option);
-        setShowSortOptions(false);
+        setShowSortModal(false);
       }}
-      className={`px-4 py-2 rounded-full mx-1 ${
-        sortBy === option ? 'bg-orange-500' : 'bg-gray-200'
+      className={`w-full px-4 py-3.5 rounded-xl mb-2 flex-row items-center ${
+        sortBy === option ? 'bg-orange-50' : 'bg-gray-50'
       }`}
     >
+      <View className={`flex-1 ${language === 'ar' ? 'items-end' : 'items-start'}`}>
       <Text
-        className={`font-CairoMedium ${
-          sortBy === option ? 'text-white' : 'text-gray-700'
+          className={`font-CairoMedium text-base ${
+            sortBy === option ? 'text-orange-500' : 'text-gray-700'
         }`}
       >
         {label}
       </Text>
+      </View>
+      {sortBy === option && (
+        <Ionicons name="checkmark-circle" size={24} color="#F8780D" />
+      )}
     </TouchableOpacity>
   );
 
@@ -407,6 +556,14 @@ const AllRides = () => {
     });
   };
 
+  const renderSkeletonList = () => (
+    <View className="flex-1 px-4">
+      {[...Array(5)].map((_, index) => (
+        <RideSkeleton key={index} />
+      ))}
+    </View>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <View className="bg-white p-4">
@@ -414,21 +571,25 @@ const AllRides = () => {
           <TouchableOpacity 
             onPress={() => router.back()} 
             className={`flex-row items-center bg-gray-100 px-2 py-2 rounded-full ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+              elevation: 2,
+            }}
           >
             <Ionicons 
               name={language === 'ar' ? 'chevron-forward' : 'chevron-back'} 
               size={20} 
               color="#F8780D"
             />
-            {/* <Text className="text-orange-300 font-CairoMedium ml-2">
-              {language === 'ar' ? 'رجوع' : 'Back'}
-            </Text> */}
           </TouchableOpacity>
           <Text className={`text-xl font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
             {language === 'ar' ? 'جميع الرحلات' : 'All Rides'}
           </Text>
           <TouchableOpacity 
-            onPress={() => setShowSortOptions(!showSortOptions)}
+            onPress={() => setShowSortModal(true)}
             className="p-2 bg-gray-100 rounded-full"
           >
             <Ionicons name="options-outline" size={20} color="#F8780D" />
@@ -463,26 +624,58 @@ const AllRides = () => {
             {renderFilterButton(FILTERS.DAY_5, getFormattedDate(5))}
           </View>
         </ScrollView>
+      </View>
 
-        {showSortOptions && (
-          <View className="mt-4">
-            <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+      <Modal
+        visible={showSortModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSortModal(false)}
+      >
+        <TouchableOpacity 
+          className="flex-1 bg-black/50"
+          activeOpacity={1}
+          onPress={() => setShowSortModal(false)}
+        >
+          <View className="flex-1 justify-end">
+            <View className="bg-white rounded-t-3xl">
+              {/* Handle bar */}
+              <View className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-2" />
+              
+              {/* Header */}
+              <View className="px-6 pb-4 border-b border-gray-100">
+                <View className={`flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <Text className={`text-xl font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
               {language === 'ar' ? 'ترتيب حسب' : 'Sort by'}
             </Text>
-            <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <TouchableOpacity 
+                    onPress={() => setShowSortModal(false)}
+                    className="p-2 rounded-full bg-gray-50"
+                  >
+                    <Ionicons name="close" size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Sort options */}
+              <View className="p-6">
+                <View className="space-y-2">
               {renderSortButton(SORT_OPTIONS.TIME_ASC, language === 'ar' ? 'الوقت (أقدم)' : 'Time (Oldest)')}
               {renderSortButton(SORT_OPTIONS.TIME_DESC, language === 'ar' ? 'الوقت (أحدث)' : 'Time (Newest)')}
               {renderSortButton(SORT_OPTIONS.SEATS_ASC, language === 'ar' ? 'المقاعد (أقل)' : 'Seats (Least)')}
               {renderSortButton(SORT_OPTIONS.SEATS_DESC, language === 'ar' ? 'المقاعد (أكثر)' : 'Seats (Most)')}
             </View>
           </View>
-        )}
+
+              {/* Bottom safe area */}
+              <View className="h-6" />
+            </View>
       </View>
+        </TouchableOpacity>
+      </Modal>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#3B82F6" />
-        </View>
+        renderSkeletonList()
       ) : error ? (
         <View className="flex-1 items-center justify-center p-4">
           <Text className={`text-red-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>{error}</Text>

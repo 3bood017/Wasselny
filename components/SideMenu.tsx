@@ -151,7 +151,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           <View className="flex-1">
             <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.language}</Text>
             <Text className={`text-gray-500 font-CairoRegular text-sm ${isRTL ? 'text-right' : 'text-left'}`}>
-              {language === 'ar' ? 'العربية' : 'English'}
+              {language === 'en' ? 'العربية' : 'English'}
             </Text>
           </View>
         </TouchableOpacity>

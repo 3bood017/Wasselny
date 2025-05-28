@@ -336,12 +336,12 @@ export default function Home() {
               </View>
             </TouchableOpacity>
 
-            <View className="mt-4">
+            {/* <View className="mt-4">
               <Text className={`text-xl ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} mb-2 px-4`}>
                 {language === 'ar' ? 'الرحلات المقترحة' : 'Suggested Rides'}
               </Text>
               <SuggestedRidesGrid refreshKey={refreshKey} />
-            </View>
+            </View> */}
 
             <View 
               className="mx-2 mt-5"
@@ -486,34 +486,16 @@ export default function Home() {
                 <TouchableOpacity
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    router.push('/(root)/create-ride');
+                    router.push('/(root)/all-rides');
                   }}
-                  className="flex-row items-center bg-white border border-secondary-700 px-1 py-1 rounded-[15px]"
-                  style={{
-                    elevation: Platform.OS === "android" ? 3 : 0,
-                    shadowColor: "#666666",
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: Platform.OS === "ios" ? 0.22 : 0,
-                    shadowRadius: Platform.OS === "ios" ? 2.22 : 0,
-                  }}
+                  className="flex-row items-center px-1 py-1 rounded-[15px]"
+                  
                 >
-                  <LinearGradient
-                    colors={["#fff", "#fff"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={{
-                      flexDirection: language === 'ar' ? 'row-reverse' : 'row',
-                      alignItems: "center",
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                      borderRadius: 20,
-                    }}
-                  >
-                    <MaterialIcons name="add" size={20} color="#666666" />
-                    <Text className={`text-secondary-700 text-sm ${language === 'ar' ? 'mr-1 font-CairoBold' : 'ml-1 font-JakartaBold'}`}>
-                      {t.newRide}
-                    </Text>
-                  </LinearGradient>
+                  <Text className="font-CairoSemiBold">
+              {language === 'ar' ? 'عرض الكل' : 'View All'}
+            </Text>
+
+                  {/* <Text className="font-CairoSemiBold">View All </Text> */}
                 </TouchableOpacity>}
               </View>
             </View>
