@@ -50,6 +50,110 @@ interface RideDetails {
   };
 }
 
+const SkeletonStatusActions = () => (
+  <View className="bg-white rounded-xl p-4 shadow-sm">
+    <View className="h-7 w-32 bg-gray-200 rounded mb-4" />
+    <View className="flex-row flex-wrap gap-1.5">
+      {[1, 2, 3, 4].map((_, index) => (
+        <View key={index} className="flex-1 min-w-[90px] h-10 bg-gray-200 rounded-lg" />
+      ))}
+    </View>
+  </View>
+);
+
+const SkeletonRouteInfo = () => (
+  <View className="bg-white rounded-xl p-4 shadow-sm">
+    <View className="flex-row items-center mb-4">
+      <View className="w-6 h-6 bg-gray-200 rounded-full" />
+      <View className="h-7 w-40 bg-gray-200 rounded ml-2" />
+    </View>
+    <View className="space-y-4">
+      {[1, 2, 3, 4, 5].map((_, index) => (
+        <View key={index} className="flex-row items-start space-x-3">
+          <View className="w-8 h-8 bg-gray-200 rounded-full" />
+          <View className="flex-1">
+            <View className="h-4 w-24 bg-gray-200 rounded mb-1" />
+            <View className="h-6 w-48 bg-gray-200 rounded" />
+          </View>
+        </View>
+      ))}
+    </View>
+  </View>
+);
+
+const SkeletonDriverInfo = () => (
+  <View className="bg-white rounded-xl p-4 shadow-sm">
+    <View className="flex-row items-center mb-4">
+      <View className="w-6 h-6 bg-gray-200 rounded-full" />
+      <View className="h-7 w-40 bg-gray-200 rounded ml-2" />
+    </View>
+    <View className="space-y-4">
+      <View className="flex-row items-center space-x-3">
+        <View className="w-16 h-16 bg-gray-200 rounded-full" />
+        <View className="flex-1">
+          <View className="h-6 w-32 bg-gray-200 rounded mb-1" />
+          <View className="h-4 w-24 bg-gray-200 rounded" />
+        </View>
+      </View>
+      {[1, 2, 3].map((_, index) => (
+        <View key={index} className="flex-row items-center space-x-3">
+          <View className="w-8 h-8 bg-gray-200 rounded-full" />
+          <View className="flex-1">
+            <View className="h-4 w-20 bg-gray-200 rounded mb-1" />
+            <View className="h-6 w-32 bg-gray-200 rounded" />
+          </View>
+        </View>
+      ))}
+      <View className="h-40 w-full bg-gray-200 rounded-lg" />
+    </View>
+  </View>
+);
+
+const SkeletonPassengerInfo = () => (
+  <View className="bg-white rounded-xl p-4 shadow-sm">
+    <View className="flex-row items-center mb-4">
+      <View className="w-6 h-6 bg-gray-200 rounded-full" />
+      <View className="h-7 w-40 bg-gray-200 rounded ml-2" />
+    </View>
+    <View className="space-y-4">
+      {[1, 2, 3].map((_, index) => (
+        <View key={index} className="flex-row items-center space-x-3">
+          <View className="w-8 h-8 bg-gray-200 rounded-full" />
+          <View className="flex-1">
+            <View className="h-4 w-20 bg-gray-200 rounded mb-1" />
+            <View className="h-6 w-32 bg-gray-200 rounded" />
+          </View>
+        </View>
+      ))}
+    </View>
+  </View>
+);
+
+const SkeletonRatingInfo = () => (
+  <View className="bg-white rounded-xl p-4 shadow-sm mb-4">
+    <View className="flex-row items-center mb-4">
+      <View className="w-6 h-6 bg-gray-200 rounded-full" />
+      <View className="h-7 w-40 bg-gray-200 rounded ml-2" />
+    </View>
+    <View className="space-y-4">
+      <View className="flex-row items-center space-x-3">
+        <View className="w-8 h-8 bg-gray-200 rounded-full" />
+        <View className="flex-1">
+          <View className="h-4 w-20 bg-gray-200 rounded mb-1" />
+          <View className="h-6 w-16 bg-gray-200 rounded" />
+        </View>
+      </View>
+      <View className="flex-row items-start space-x-3">
+        <View className="w-8 h-8 bg-gray-200 rounded-full" />
+        <View className="flex-1">
+          <View className="h-4 w-20 bg-gray-200 rounded mb-1" />
+          <View className="h-20 w-full bg-gray-200 rounded" />
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
 const RideDetails = () => {
   const { user } = useUser();
   const { language } = useLanguage();
@@ -272,9 +376,28 @@ const RideDetails = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#F97316" />
-        <Text className="text-gray-600 mt-4">Loading ride details...</Text>
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <ScrollView className="flex-1">
+          {/* Header with Gradient Background */}
+          <View className="bg-orange-500 px-4 pt-4 pb-6">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="w-10 h-10 bg-white/20 rounded-full" />
+              <View className="h-8 w-32 bg-white/20 rounded" />
+              <View className="w-10" />
+            </View>
+            <View className="h-8 w-24 bg-white/20 rounded-full" />
+          </View>
+
+          <View className="px-4 -mt-4">
+            <View className="space-y-4">
+              <SkeletonStatusActions />
+              <SkeletonRouteInfo />
+              <SkeletonDriverInfo />
+              <SkeletonPassengerInfo />
+              <SkeletonRatingInfo />
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }

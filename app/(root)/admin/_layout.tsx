@@ -15,6 +15,7 @@ const RootLayout = () => {
                <Stack.Screen name="rideDetails" options={{ headerShown: false }} />
                <Stack.Screen name="userDetails" options={{ headerShown: false }} />
                <Stack.Screen name="index" options={{ headerShown: false }} />
+               <Stack.Screen name="support-messages" options={{ headerShown: false }} />
                
                
             

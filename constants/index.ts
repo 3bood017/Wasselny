@@ -54,6 +54,8 @@ import smoking from "@/assets/icons/smoking.png";
 import music from "@/assets/icons/music.png";
 import children from "@/assets/icons/children.png";
 import translate from "@/assets/icons/Translate.png";
+import barriers from "@/assets/icons/barriers.png";
+
 
 
 export const images = {
@@ -70,6 +72,7 @@ export const images = {
 };
 
 export const icons = {
+    barriers,
     translate,
     repeat,
     filter,

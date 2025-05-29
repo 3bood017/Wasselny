@@ -12,6 +12,7 @@ import { collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc } 
 import { db } from '@/lib/firebase';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/components/Header';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface SavedLocation {
   id: string;
@@ -21,6 +22,48 @@ interface SavedLocation {
   isDefault: boolean;
   address?: string;
 }
+
+// Skeleton Loading Components
+const MapSkeleton = () => (
+  <View className="h-[280px] bg-gray-100 rounded-2xl overflow-hidden">
+    <View className="w-full h-full bg-gray-200 animate-pulse">
+      <View className="absolute top-4 left-4 w-8 h-8 bg-white rounded-full shadow-md" />
+      <View className="absolute top-4 right-4 w-8 h-8 bg-white rounded-full shadow-md" />
+      <View className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-12 h-12 bg-white rounded-full shadow-md" />
+    </View>
+  </View>
+);
+
+const ActionButtonSkeleton = () => (
+  <View className="p-4">
+    <View className="bg-gray-200 rounded-lg p-4 mb-4 h-14 animate-pulse" />
+  </View>
+);
+
+const SavedLocationSkeleton = () => (
+  <View className="p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm">
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1">
+        <View className="w-32 h-5 bg-gray-200 rounded-full animate-pulse mb-2" />
+        <View className="w-48 h-4 bg-gray-200 rounded-full animate-pulse" />
+      </View>
+      <View className="w-7 h-7 rounded-full border-2 border-gray-200 animate-pulse" />
+    </View>
+  </View>
+);
+
+const LocationSkeleton = () => (
+  <Animated.View entering={FadeIn} className="flex-1">
+    <MapSkeleton />
+    <ActionButtonSkeleton />
+    <View className="flex-1 px-4">
+      <View className="w-40 h-6 bg-gray-200 rounded-full animate-pulse mb-4" />
+      {[1, 2, 3].map((_, index) => (
+        <SavedLocationSkeleton key={index} />
+      ))}
+    </View>
+  </Animated.View>
+);
 
 export default function LocationScreen() {
   const router = useRouter();
@@ -429,163 +472,163 @@ export default function LocationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-        <Header title={language === 'ar' ? 'ادارة الموقع ' : 'Manage Location' } showProfileImage={false} showSideMenu={false} />
-        <ScrollView className="flex-1">
-        {/* Map View */}
-        <View className="h-[280px]">
-          {currentLocation ? (
-            <MapView
-              provider={PROVIDER_GOOGLE}
-              className="w-full h-full rounded-2xl"
-              region={mapRegion}
-              onRegionChangeComplete={setMapRegion}
-              minZoomLevel={7}  // Prevent zooming out too far
-              maxZoomLevel={18} // Prevent zooming in too close
-              showsUserLocation={true}
-              showsMyLocationButton={true}
-              showsCompass={true}
-              showsScale={true}
-              showsTraffic={false}
-              showsBuildings={true}
-              showsIndoors={true}
-              showsPointsOfInterest={true}
-        zoomEnabled={true}
-        loadingEnabled={true}
-        loadingIndicatorColor="#F97316"
-        loadingBackgroundColor="#FFFFFF"
-        customMapStyle={[
-          {
-            featureType: "poi",
-            elementType: "labels",
-            stylers: [{ visibility: "on" }],
-          },
-        ]}
-            >
-              <Marker
-                coordinate={{
-                  latitude: currentLocation.coords.latitude,
-                  longitude: currentLocation.coords.longitude,
-                }}
-                title={language === 'ar' ? 'موقعك الحالي' : 'Your Current Location'}
-                pinColor="#f97316"
-              />
-              {savedLocations.map((loc) => (
-                <Marker
-                  key={loc.id}
-                  coordinate={{
-                    latitude: loc.latitude,
-                    longitude: loc.longitude,
-                  }}
-                  title={loc.name}
-                  pinColor={loc.isDefault ? '#ef4444' : '#3b82f6'}
-                />
-              ))}
-            </MapView>
-          ) : (
-            <View className="flex-1 justify-center items-center">
-              <ActivityIndicator size="large" color="#f97316" />
-              <Text className={`text-gray-500 mt-2 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
-                {language === 'ar' ? 'جاري تحميل الخريطة...' : 'Loading map...'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Actions */}
-        <View className="p-4">
-          <TouchableOpacity
-            onPress={saveNewLocation}
-            className="bg-orange-500 rounded-lg p-4 mb-4 flex-row items-center justify-center"
-            disabled={!currentLocation || loading || buttonLoading.saveLocation}
-          >
-            {buttonLoading.saveLocation ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <MaterialIcons name="add-location" size={24} color="white" className={language === 'ar' ? 'ml-2' : 'mr-2'} />
-            )}
-            <Text className={`text-white text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-              {buttonLoading.saveLocation 
-                ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...')
-                : (language === 'ar' ? 'حفظ الموقع الحالي' : 'Save Current Location')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Saved Locations */}
-        <View className="flex-1 px-4">
-          <Text className={`text-lg mb-4 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
-            {language === 'ar' ? 'المواقع المحفوظة' : 'Saved Locations'}
-          </Text>
-          
-          {loading ? (
-            <View className="items-center justify-center py-4">
-              <ActivityIndicator size="large" color="#f97316" />
-              <Text className={`text-gray-500 mt-2 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
-                {language === 'ar' ? 'جاري تحميل العناوين...' : 'Loading addresses...'}
-              </Text>
-            </View>
-          ) : savedLocations.length === 0 ? (
-            <View className="items-center justify-center py-4">
-              <Text className={`text-gray-500 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
-                {language === 'ar' ? 'لا توجد مواقع محفوظة' : 'No saved locations'}
-              </Text>
-            </View>
-          ) : (
-            savedLocations.map((location) => {
-              const isArabicName = containsArabic(location.name);
-              return (
-                <TouchableOpacity
-                  key={location.id}
-                  onPress={() => setAsDefault(location)}
-                  className={`p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm relative ${language === 'ar' ? 'rtl' : 'ltr'}`}
-                  disabled={buttonLoading.setDefault === location.id || buttonLoading.delete === location.id}
+      <Header title={language === 'ar' ? 'ادارة الموقع ' : 'Manage Location' } showProfileImage={false} showSideMenu={false} />
+      <ScrollView className="flex-1">
+        {loading ? (
+          <LocationSkeleton />
+        ) : (
+          <>
+            {/* Map View */}
+            <View className="h-[280px]">
+              {currentLocation ? (
+                <MapView
+                  provider={PROVIDER_GOOGLE}
+                  className="w-full h-full rounded-2xl"
+                  region={mapRegion}
+                  onRegionChangeComplete={setMapRegion}
+                  minZoomLevel={7}
+                  maxZoomLevel={18}
+                  showsUserLocation={true}
+                  showsMyLocationButton={true}
+                  showsCompass={true}
+                  showsScale={true}
+                  showsTraffic={false}
+                  showsBuildings={true}
+                  showsIndoors={true}
+                  showsPointsOfInterest={true}
+                  zoomEnabled={true}
+                  loadingEnabled={true}
+                  loadingIndicatorColor="#F97316"
+                  loadingBackgroundColor="#FFFFFF"
+                  customMapStyle={[
+                    {
+                      featureType: "poi",
+                      elementType: "labels",
+                      stylers: [{ visibility: "on" }],
+                    },
+                  ]}
                 >
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      confirmDelete(location);
+                  <Marker
+                    coordinate={{
+                      latitude: currentLocation.coords.latitude,
+                      longitude: currentLocation.coords.longitude,
                     }}
-                    className={`absolute top-1.5 ${language === 'ar' ? 'left-1.5' : 'right-1.5'} z-10`}
-                    disabled={buttonLoading.delete === location.id}
-                  >
-                    {buttonLoading.delete === location.id ? (
-                      <ActivityIndicator size="small" color="#ef4444" />
-                    ) : (
-                      <MaterialIcons name="close" size={16} color="#ef4444" />
-                    )}
-                  </TouchableOpacity>
+                    title={language === 'ar' ? 'موقعك الحالي' : 'Your Current Location'}
+                    pinColor="#f97316"
+                  />
+                  {savedLocations.map((loc) => (
+                    <Marker
+                      key={loc.id}
+                      coordinate={{
+                        latitude: loc.latitude,
+                        longitude: loc.longitude,
+                      }}
+                      title={loc.name}
+                      pinColor={loc.isDefault ? '#ef4444' : '#3b82f6'}
+                    />
+                  ))}
+                </MapView>
+              ) : (
+                <MapSkeleton />
+              )}
+            </View>
 
-                  <View className={`flex-row items-center justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                    <View className={`flex-1 ${language === 'ar' ? 'items-end' : 'items-start'}`}>
-                      <Text className={`text-base ${language === 'ar' ? 'font-CairoBold text-right' : 'font-CairoBold text-left'}`}>
-                        {location.name}
-                      </Text>
-                      <Text className={`text-sm text-gray-500 mt-0.5 ${language === 'ar' ? 'font-Cairo text-right' : 'font-Jakarta text-left'}`}>
-                        {locationAddresses[location.id] || (language === 'ar' ? 'جاري تحميل العنوان...' : 'Loading address...')}
-                      </Text>
-                      {location.isDefault && (
-                        <Text className={`text-xs text-orange-500 mt-1 font-CairoSemiBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                          {language === 'ar' ? 'الموقع الافتراضي' : 'Default Location'}
-                        </Text>
-                      )}
-                    </View>
-                    {buttonLoading.setDefault === location.id ? (
-                      <View className={`w-7 h-7 items-center justify-center ${language === 'ar' ? 'ml-3' : 'mr-3'}`}>
-                        <ActivityIndicator size="small" color="#f97316" />
+            {/* Actions */}
+            <View className="p-4">
+              <TouchableOpacity
+                onPress={saveNewLocation}
+                className="bg-orange-500 rounded-lg p-4 mb-4 flex-row items-center justify-center"
+                disabled={!currentLocation || loading || buttonLoading.saveLocation}
+              >
+                {buttonLoading.saveLocation ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <MaterialIcons name="add-location" size={24} color="white" className={language === 'ar' ? 'ml-2' : 'mr-2'} />
+                )}
+                <Text className={`text-white text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+                  {buttonLoading.saveLocation 
+                    ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...')
+                    : (language === 'ar' ? 'حفظ الموقع الحالي' : 'Save Current Location')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Saved Locations */}
+            <View className="flex-1 px-4">
+              <Text className={`text-lg mb-4 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+                {language === 'ar' ? 'المواقع المحفوظة' : 'Saved Locations'}
+              </Text>
+              
+              {loading ? (
+                <View className="space-y-3">
+                  {[1, 2, 3].map((_, index) => (
+                    <SavedLocationSkeleton key={index} />
+                  ))}
+                </View>
+              ) : savedLocations.length === 0 ? (
+                <View className="items-center justify-center py-4">
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-Cairo' : 'font-Jakarta'}`}>
+                    {language === 'ar' ? 'لا توجد مواقع محفوظة' : 'No saved locations'}
+                  </Text>
+                </View>
+              ) : (
+                savedLocations.map((location) => {
+                  const isArabicName = containsArabic(location.name);
+                  return (
+                    <TouchableOpacity
+                      key={location.id}
+                      onPress={() => setAsDefault(location)}
+                      className={`p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm relative ${language === 'ar' ? 'rtl' : 'ltr'}`}
+                      disabled={buttonLoading.setDefault === location.id || buttonLoading.delete === location.id}
+                    >
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          confirmDelete(location);
+                        }}
+                        className={`absolute top-1.5 ${language === 'ar' ? 'left-1.5' : 'right-1.5'} z-10`}
+                        disabled={buttonLoading.delete === location.id}
+                      >
+                        {buttonLoading.delete === location.id ? (
+                          <ActivityIndicator size="small" color="#ef4444" />
+                        ) : (
+                          <MaterialIcons name="close" size={16} color="#ef4444" />
+                        )}
+                      </TouchableOpacity>
+
+                      <View className={`flex-row items-center justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                        <View className={`flex-1 ${language === 'ar' ? 'items-end' : 'items-start'}`}>
+                          <Text className={`text-base ${language === 'ar' ? 'font-CairoBold text-right' : 'font-CairoBold text-left'}`}>
+                            {location.name}
+                          </Text>
+                          <Text className={`text-sm text-gray-500 mt-0.5 ${language === 'ar' ? 'font-Cairo text-right' : 'font-Jakarta text-left'}`}>
+                            {locationAddresses[location.id] || (language === 'ar' ? 'جاري تحميل العنوان...' : 'Loading address...')}
+                          </Text>
+                          {location.isDefault && (
+                            <Text className={`text-xs text-orange-500 mt-1 font-CairoSemiBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'الموقع الافتراضي' : 'Default Location'}
+                            </Text>
+                          )}
+                        </View>
+                        {buttonLoading.setDefault === location.id ? (
+                          <View className={`w-7 h-7 items-center justify-center ${language === 'ar' ? 'ml-3' : 'mr-3'}`}>
+                            <ActivityIndicator size="small" color="#f97316" />
+                          </View>
+                        ) : location.isDefault ? (
+                          <View className={`w-7 h-7 rounded-full border-2 border-orange-500 items-center justify-center ${language === 'ar' ? 'ml-3' : 'mr-3'}`}>
+                            <View className="w-4 h-4 rounded-full bg-orange-500" />
+                          </View>
+                        ) : (
+                          <View className={`w-7 h-7 rounded-full border-2 border-orange-500 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
+                        )}
                       </View>
-                    ) : location.isDefault ? (
-                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 items-center justify-center ${language === 'ar' ? 'ml-3' : 'mr-3'}`}>
-                        <View className="w-4 h-4 rounded-full bg-orange-500" />
-                      </View>
-                    ) : (
-                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Location Name Modal */}

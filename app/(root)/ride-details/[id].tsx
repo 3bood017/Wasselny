@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Platform, TextInput } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Platform, TextInput, Animated, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, onSnapshot, query, where, getDocs, Timestamp, orderBy, limit, setDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +16,8 @@ import * as Haptics from 'expo-haptics';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { AirbnbRating } from 'react-native-ratings';
 import { useLanguage } from '@/context/LanguageContext';
+import * as Location from 'expo-location';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface DriverData {
   car_seats?: number;
@@ -74,6 +76,7 @@ interface RideRequest {
   notification_id?: string;
   passenger_name?: string;
   is_waitlist?: boolean;
+  requested_seats?: number;
   selected_waypoint?: {
     latitude: number;
     longitude: number;
@@ -155,6 +158,26 @@ const RideDetails = () => {
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   const { t, language } = useLanguage();
+
+  // Add new state for passenger locations
+  const [passengerLocations, setPassengerLocations] = useState<Record<string, { latitude: number; longitude: number; name: string }>>({});
+
+  // Add new state for seat selection modal
+  const [showSeatModal, setShowSeatModal] = useState(false);
+  const [selectedSeats, setSelectedSeats] = useState(1);
+
+  // Add new state for animation
+  const [modalAnimation] = useState(new Animated.Value(0));
+
+  // Add animation function
+  const animateModal = (show: boolean) => {
+    Animated.spring(modalAnimation, {
+      toValue: show ? 1 : 0,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 7
+    }).start();
+  };
 
   // Cache helper functions
   const cacheRideDetails = async (rideId: string, rideData: Ride) => {
@@ -350,10 +373,24 @@ const RideDetails = () => {
         const q = query(rideRequestsRef, where('ride_id', '==', ride.id), where('status', 'in', ['accepted', 'checked_in', 'checked_out']));
         const snapshot = await getDocs(q);
         const passengers: RideRequest[] = [];
+        const locations: Record<string, { latitude: number; longitude: number; name: string }> = {};
+        
         snapshot.forEach((doc) => {
-          passengers.push({ id: doc.id, ...doc.data() } as RideRequest);
+          const data = doc.data();
+          passengers.push({ id: doc.id, ...data } as RideRequest);
+          
+          // If passenger has checked in, add their location
+          if (data.status === 'checked_in' && data.current_location) {
+            locations[data.user_id] = {
+              latitude: data.current_location.latitude,
+              longitude: data.current_location.longitude,
+              name: data.passenger_name || 'الراكب'
+            };
+          }
         });
+        
         setAllPassengers(passengers);
+        setPassengerLocations(locations);
       } catch (error) {
         console.error('Error fetching passengers:', error);
         setError('فشل تحميل قائمة الركاب.');
@@ -428,24 +465,6 @@ const RideDetails = () => {
         return;
       }
 
-      //       // Get user's data (name and gender)
-      //       const userDoc = await getDoc(doc(db, 'users', userId));
-      //       const userData = userDoc.data();
-      //       const userName = userData?.name || 'الراكب';
-      //       const userGender = userData?.gender || 'غير محدد';
-
-
-      //             // Check if the user's gender matches the ride's required gender
-      // if (ride.required_gender !== 'كلاهما') {
-      //   if (ride.required_gender === 'ذكر' && userGender !== 'Male') {
-      //     Alert.alert('غير مسموح', 'هذه الرحلة مخصصة للركاب الذكور فقط.');
-      //     return;
-      //   }
-      //   if (ride.required_gender === 'أنثى' && userGender !== 'Female') {
-      //     Alert.alert('غير مسموح', 'هذه الرحلة مخصصة للركاب الإناث فقط.');
-      //     return;
-      //   }
-      // }
       // Check if ride has already started or completed
       if (ride.status === 'in-progress' || ride.status === 'completed' || ride.status === 'cancelled') {
         Alert.alert('غير متاح', 'لا يمكن حجز هذه الرحلة لأنها قد بدأت أو انتهت أو تم إلغاؤها .');
@@ -465,11 +484,7 @@ const RideDetails = () => {
             {
               text: 'إرسال طلب',
               onPress: () => {
-                if (ride.waypoints && ride.waypoints.length > 0) {
-                  setShowWaypointModal(true);
-                } else {
-                  handleBookRideWithWaypoint(null);
-                }
+                setShowSeatModal(true);
               }
             }
           ]
@@ -477,10 +492,63 @@ const RideDetails = () => {
         return;
       }
 
+      setShowSeatModal(true);
+    } catch (error) {
+      console.error('Booking error:', error);
+      Alert.alert('حدث خطأ أثناء إرسال طلب الحجز.');
+    }
+  };
+
+  // Add new function to handle booking with seat selection
+  const handleBookRideWithSeats = async (seats: number) => {
+    try {
+      if (Platform.OS === 'android') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      if (!ride || !ride.id || !ride.driver_id || !userId) {
+        Alert.alert('معلومات الرحلة غير مكتملة');
+        return;
+      }
+
+      // Check if ride has already started or completed
+      if (ride.status === 'in-progress' || ride.status === 'completed' || ride.status === 'cancelled') {
+        Alert.alert('غير متاح', 'لا يمكن حجز هذه الرحلة لأنها قد بدأت أو انتهت أو تم إلغاؤها .');
+        return;
+      }
+
+      // Check if requested seats are available
+      if (ride.available_seats < seats) {
+        Alert.alert(
+          'المقاعد غير متوفرة',
+          `عذراً، لا يوجد سوى ${ride.available_seats} مقاعد متاحة.`,
+          [{ text: 'حسناً', style: 'cancel' }]
+        );
+        return;
+      }
+
+      // Get user's data
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const userData = userDoc.data();
+      const userName = userData?.name || 'الراكب';
+      const userGender = userData?.gender || 'غير محدد';
+
+      // Check gender requirements
+      if (ride.required_gender !== 'كلاهما') {
+        if (ride.required_gender === 'ذكر' && userGender !== 'Male') {
+          Alert.alert('غير مسموح', 'هذه الرحلة مخصصة للركاب الذكور فقط.');
+          return;
+        }
+        if (ride.required_gender === 'أنثى' && userGender !== 'Female') {
+          Alert.alert('غير مسموح', 'هذه الرحلة مخصصة للركاب الإناث فقط.');
+          return;
+        }
+      }
+
+      // Show waypoint selection if available
       if (ride.waypoints && ride.waypoints.length > 0) {
         setShowWaypointModal(true);
       } else {
-        handleBookRideWithWaypoint(null);
+        handleBookRideWithWaypoint(null, seats);
       }
     } catch (error) {
       console.error('Booking error:', error);
@@ -489,23 +557,11 @@ const RideDetails = () => {
   };
 
   // Add new function to handle booking with waypoint
-  const handleBookRideWithWaypoint = async (waypoint: { latitude: number; longitude: number; address: string; street?: string } | null) => {
+  const handleBookRideWithWaypoint = async (waypoint: { latitude: number; longitude: number; address: string; street?: string } | null, seats: number = 1) => {
     try {
       const userDoc = await getDoc(doc(db, 'users', userId as string));
       const userData = userDoc.data();
       const userName = userData?.name || 'الراكب';
-      const userGender = userData?.gender || 'غير محدد';
-
-      if (ride?.required_gender !== 'كلاهما') {
-        if (ride?.required_gender === 'ذكر' && userGender !== 'Male') {
-          Alert.alert('غير مسموح', 'هذه الرحلة مخصصة للركاب الذكور فقط.');
-          return;
-        }
-        if (ride?.required_gender === 'أنثى' && userGender !== 'Female') {
-          Alert.alert('غير مسموح', 'هذه الرحلة مخصصة للركاب الإناث فقط.');
-          return;
-        }
-      }
 
       const rideRequestRef = await addDoc(collection(db, 'ride_requests'), {
         ride_id: ride?.id,
@@ -520,7 +576,8 @@ const RideDetails = () => {
           longitude: waypoint.longitude,
           address: waypoint.address,
           street: waypoint.street
-        } : null
+        } : null,
+        requested_seats: seats
       });
 
       if (ride?.driver_id) {
@@ -627,12 +684,55 @@ const RideDetails = () => {
         return;
       }
 
+      // Get current location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('خطأ', 'يجب السماح بالوصول إلى الموقع للمتابعة');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const currentLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        timestamp: new Date().toISOString()
+      };
+
+      // Update ride request status
       await updateDoc(doc(db, 'ride_requests', rideRequest.id), {
         status: 'checked_in',
         updated_at: serverTimestamp(),
+        current_location: currentLocation
       });
 
-      // Removed updating available_seats to keep it unchanged in Firestore
+      // Update user's current location
+      await updateDoc(doc(db, 'users', userId), {
+        current_location: currentLocation
+      });
+
+      // Get all active shares for this user
+      const sharesRef = collection(db, 'location_shares');
+      const q = query(sharesRef, where('shared_by', '==', userId), where('status', '==', 'active'));
+      const sharesSnapshot = await getDocs(q);
+
+      // Notify all users who share location with this passenger
+      for (const shareDoc of sharesSnapshot.docs) {
+        const shareData = shareDoc.data();
+        await sendRideStatusNotification(
+          shareData.shared_with,
+          'الراكب في الرحلة',
+          `بدأ ${passengerNames[userId] || 'الراكب'} رحلته من ${ride.origin_address} إلى ${ride.destination_address}`,
+          ride.id
+        );
+
+        // Update the location share with current location
+        await updateDoc(doc(db, 'location_shares', shareDoc.id), {
+          last_location: currentLocation,
+          last_updated: serverTimestamp()
+        });
+      }
+
+      // Notify driver
       await sendRideStatusNotification(
         ride.driver_id || '',
         'الراكب وصل',
@@ -658,27 +758,69 @@ const RideDetails = () => {
         return;
       }
 
+      // Get current location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('خطأ', 'يجب السماح بالوصول إلى الموقع للمتابعة');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const currentLocation = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        timestamp: new Date().toISOString()
+      };
+
       if (rideRequest.notification_id) {
         await cancelNotification(rideRequest.notification_id);
         console.log(`Cancelled notification ${rideRequest.notification_id}`);
       }
 
+      // Update ride request status
       await updateDoc(doc(db, 'ride_requests', rideRequest.id), {
         status: 'checked_out',
         updated_at: serverTimestamp(),
+        current_location: currentLocation
       });
 
-     // إرسال إشعار للسائق
-     const notificationSent = await sendCheckOutNotificationForDriver(
-      ride.driver_id || '',
-      passengerNames[userId] || 'الراكب', // تمرير اسم الراكب
-      ride.id
-    );
+      // Update user's current location
+      await updateDoc(doc(db, 'users', userId), {
+        current_location: currentLocation
+      });
 
-    if (!notificationSent) {
-      console.warn('Failed to send check-out notification to driver');
-    }
+      // Get all active shares for this user
+      const sharesRef = collection(db, 'location_shares');
+      const q = query(sharesRef, where('shared_by', '==', userId), where('status', '==', 'active'));
+      const sharesSnapshot = await getDocs(q);
 
+      // Notify all users who share location with this passenger
+      for (const shareDoc of sharesSnapshot.docs) {
+        const shareData = shareDoc.data();
+        await sendRideStatusNotification(
+          shareData.shared_with,
+          'انتهت الرحلة',
+          `انتهت رحلة ${passengerNames[userId] || 'الراكب'} من ${ride.origin_address} إلى ${ride.destination_address}`,
+          ride.id
+        );
+
+        // Update the location share with current location
+        await updateDoc(doc(db, 'location_shares', shareDoc.id), {
+          last_location: currentLocation,
+          last_updated: serverTimestamp()
+        });
+      }
+
+      // Notify driver
+      const notificationSent = await sendCheckOutNotificationForDriver(
+        ride.driver_id || '',
+        passengerNames[userId] || 'الراكب',
+        ride.id
+      );
+
+      if (!notificationSent) {
+        console.warn('Failed to send check-out notification to driver');
+      }
 
       setShowRatingModal(true);
     } catch (error) {
@@ -873,6 +1015,13 @@ const RideDetails = () => {
     [formattedRide, language]
   );
 
+  // Add this function to calculate total seats taken
+  const calculateTotalSeatsTaken = useCallback(() => {
+    return allPassengers.reduce((total, passenger) => {
+      return total + (passenger.requested_seats || 1);
+    }, 0);
+  }, [allPassengers]);
+
   // Render ride details
   const renderRideDetails = useCallback(
     () => (
@@ -973,7 +1122,7 @@ const RideDetails = () => {
           <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             <MaterialIcons name="event-seat" size={20} color="#000" className={language === 'ar' ? 'ml-3' : 'mr-3'} />
             <Text className={`text-black font-CairoMedium ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
-              {`${formattedRide?.available_seats}/${allPassengers.length} ${language === 'ar' ? 'مقاعد' : 'seats'}`}
+              {`${calculateTotalSeatsTaken()}/${formattedRide?.available_seats || DEFAULT_CAR_SEATS} ${language === 'ar' ? 'مقاعد' : 'seats'}`}
             </Text>
           </View>
         </View>
@@ -1092,7 +1241,7 @@ const RideDetails = () => {
         </View>
       </View>
     ),
-    [formattedRide, allPassengers, isDriver, language]
+    [formattedRide, allPassengers, isDriver, language, calculateTotalSeatsTaken]
   );
 
   // Render current passengers
@@ -1151,6 +1300,11 @@ const RideDetails = () => {
                   {language === 'ar' ? 'الاسم' : 'Name'}
                 </Text>
               </View>
+              <View className="w-24">
+                <Text className={`text-sm font-CairoBold text-gray-700 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'المقاعد' : 'Seats'}
+                </Text>
+              </View>
               <View className="w-49">
                 <Text className={`text-sm font-CairoBold text-gray-700 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' ? 'نقطة التوقف' : 'Stop Point'}
@@ -1167,6 +1321,11 @@ const RideDetails = () => {
                   />
                   <Text className={`text-sm pt-1.5 text-gray-700 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {passengerNames[passenger.user_id] || (language === 'ar' ? 'الراكب' : 'Passenger')}
+                  </Text>
+                </View>
+                <View className="w-20 justify-center">
+                  <Text className={`text-sm pt-1.5 text-gray-700 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {passenger.requested_seats || 1} {passenger.requested_seats === 1 ? t.seat : t.seats}
                   </Text>
                 </View>
                 <View className="w-49 justify-center">
@@ -1202,7 +1361,7 @@ const RideDetails = () => {
         )}
       </View>
     ),
-    [allPassengers, passengerNames, ride, isDriver, pendingRequestsCount, language]
+    [allPassengers, passengerNames, ride, isDriver, pendingRequestsCount, language, t.seat, t.seats]
   );
 
   // Add these new functions after the existing handle functions
@@ -1905,6 +2064,225 @@ const RideDetails = () => {
     }
   }, [ride?.ride_datetime]);
 
+  // Add real-time listener for passenger location updates
+  useEffect(() => {
+    if (!ride?.id || !isDriver) return;
+
+    const rideRequestsRef = collection(db, 'ride_requests');
+    const q = query(rideRequestsRef, where('ride_id', '==', ride.id), where('status', '==', 'checked_in'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const data = change.doc.data();
+        if (data.current_location) {
+          setPassengerLocations(prev => {
+            const updated = {
+              ...prev,
+              [data.user_id]: {
+                latitude: data.current_location.latitude,
+                longitude: data.current_location.longitude,
+                name: data.passenger_name || 'الراكب'
+              }
+            };
+            console.log('Updated passenger locations:', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [ride?.id, isDriver]);
+
+  // Update the seat selection modal component
+  const renderSeatModal = () => {
+    const translateY = modalAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [300, 0]
+    });
+
+    const opacity = modalAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1]
+    });
+
+    return (
+      <Modal
+        visible={showSeatModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => {
+          animateModal(false);
+          setTimeout(() => setShowSeatModal(false), 200);
+        }}
+        onShow={() => animateModal(true)}
+      >
+        <Animated.View 
+          style={[
+            { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' },
+            { opacity }
+          ]}
+          className="justify-end"
+        >
+          <Animated.View 
+            style={[
+              { transform: [{ translateY }] },
+              { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24 }
+            ]}
+          >
+            <LinearGradient
+              colors={['#fff', '#f8f9fa']}
+              className="p-6 rounded-t-3xl"
+            >
+              {/* Header */}
+              <View className="items-center mb-6">
+                <View className="w-12 h-1 bg-gray-300 rounded-full mb-4" />
+                <Text className="text-2xl font-CairoBold text-gray-800">
+                  {language === 'ar' ? 'اختر عدد المقاعد' : 'Select Number of Seats'}
+                </Text>
+                <Text className="text-sm text-gray-500 mt-1">
+                  {language === 'ar' ? 'حدد عدد المقاعد التي تريد حجزها' : 'Choose how many seats you want to book'}
+                </Text>
+              </View>
+
+              {/* Seat Counter */}
+              <View className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
+                <View className="flex-row justify-between items-center">
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (Platform.OS === 'android') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                      setSelectedSeats(Math.max(1, selectedSeats - 1));
+                    }}
+                    className="bg-gray-100 p-4 rounded-full"
+                  >
+                    <MaterialIcons name="remove" size={24} color="#f97316" />
+                  </TouchableOpacity>
+
+                  <View className="items-center">
+                    <Text className="text-2xl font-CairoBold text-gray-800 mt-4">
+                      {selectedSeats}
+                    </Text>
+                    <Text className="text-sm text-gray-500">
+                      {language === 'ar' ? 'مقاعد' : 'Seats'}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (Platform.OS === 'android') {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }
+                      setSelectedSeats(Math.min(ride?.available_seats || 1, selectedSeats + 1));
+                    }}
+                    className="bg-gray-100 p-4 rounded-full"
+                  >
+                    <MaterialIcons name="add" size={24} color="#f97316" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Available Seats Info */}
+              <View className="bg-orange-50 rounded-xl p-4 mb-6">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <MaterialIcons name="event-seat" size={24} color="#f97316" />
+                    <Text className="text-orange-800 font-CairoMedium mr-2">
+                      {language === 'ar' ? 'المقاعد المتاحة:' : 'Available seats:'}
+                    </Text>
+                  </View>
+                  <Text className="text-orange-800 font-CairoBold text-lg">
+                    {ride?.available_seats}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Buttons */}
+              <View className="flex-row space-x-3">
+                <TouchableOpacity
+                  onPress={() => {
+                    if (Platform.OS === 'android') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }
+                    animateModal(false);
+                    setTimeout(() => {
+                      setShowSeatModal(false);
+                      handleBookRideWithSeats(selectedSeats);
+                    }, 200);
+                  }}
+                  className="flex-1 bg-orange-500 py-4 rounded-xl"
+                >
+                  <Text className="text-white font-CairoBold text-center text-lg">
+                    {language === 'ar' ? 'تأكيد' : 'Confirm'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    if (Platform.OS === 'android') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    }
+                    animateModal(false);
+                    setTimeout(() => setShowSeatModal(false), 200);
+                  }}
+                  className="flex-1 bg-gray-200 py-4 rounded-xl"
+                >
+                  <Text className="text-gray-700 font-CairoBold text-center text-lg">
+                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+    );
+  };
+
+  const getStatusTranslation = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'waiting': t.pending,
+      'accepted': t.available,
+      'rejected': t.ended,
+      'checked_in': t.Active,
+      'checked_out': t.ended,
+      'cancelled': t.ended
+    };
+    return statusMap[status] || status;
+  };
+
+  const renderPassengerList = () => {
+    return allPassengers.map((passenger) => (
+      <View key={passenger.id} className="flex-row items-center justify-between p-4 bg-white rounded-lg mb-2">
+        <View className="flex-1">
+          <Text className="text-lg font-CairoBold text-gray-800">
+            {passengerNames[passenger.id] || t.user}
+          </Text>
+          {passenger.selected_waypoint && (
+            <Text className="text-sm font-CairoRegular text-gray-600 mt-1">
+              {t.currentLocation}: {passenger.selected_waypoint.address}
+            </Text>
+          )}
+          {passengerLocations[passenger.id] && (
+            <Text className="text-sm font-CairoRegular text-gray-600 mt-1">
+              {t.currentLocation}: {`${passengerLocations[passenger.id].latitude.toFixed(6)}, ${passengerLocations[passenger.id].longitude.toFixed(6)}`}
+            </Text>
+          )}
+        </View>
+        <View className="flex-row items-center">
+          <Text className={`text-sm font-CairoRegular mr-2 ${
+            passenger.status === 'checked_in' ? 'text-green-600' :
+            passenger.status === 'accepted' ? 'text-blue-600' :
+            'text-gray-600'
+          }`}>
+            {getStatusTranslation(passenger.status)}
+          </Text>
+        </View>
+      </View>
+    ));
+  };
+
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-white">
@@ -1963,6 +2341,7 @@ const RideDetails = () => {
 
       {renderRatingModal()}
       {renderWaypointModal()}
+      {renderSeatModal()}
 
       {/* Image Modal */}
       <Modal

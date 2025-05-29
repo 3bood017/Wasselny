@@ -56,12 +56,7 @@ const RootLayout = () => {
                  }}
                />
                <Stack.Screen name="privacy-policy" options={{
-                   headerTitle: language === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy',
-                   headerTitleStyle: {
-                     fontFamily: language === 'ar' ? 'Cairo-Bold' : 'PlusJakartaSans-Bold',
-                     fontSize: 18,
-                   },
-                   headerTitleAlign: 'center',
+                   headerShown: false
                  }}
                />
                <Stack.Screen name="location" options={{ headerShown: false }} />

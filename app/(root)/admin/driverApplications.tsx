@@ -7,6 +7,8 @@ import { useUser } from '@clerk/clerk-expo';
 import CustomButton from '@/components/CustomButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useLanguage } from '@/context/LanguageContext';
+import Header from '@/components/Header';
 
 interface DriverApplication {
   id: string;
@@ -23,8 +25,48 @@ interface DriverApplication {
   license_number?: string;
 }
 
+const SkeletonApplicationCard = () => (
+  <View className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
+    <View className="flex-row items-center mb-4">
+      <View className="w-16 h-16 bg-gray-200 rounded-full" />
+      <View className="flex-1 ml-4">
+        <View className="h-6 w-32 bg-gray-200 rounded mb-2" />
+        <View className="h-4 w-48 bg-gray-200 rounded mb-1" />
+        <View className="h-4 w-36 bg-gray-200 rounded" />
+      </View>
+    </View>
+
+    <View className="space-y-2 mb-4">
+      <View className="flex-row justify-between">
+        <View className="h-4 w-24 bg-gray-200 rounded" />
+        <View className="h-4 w-32 bg-gray-200 rounded" />
+      </View>
+      <View className="flex-row justify-between">
+        <View className="h-4 w-20 bg-gray-200 rounded" />
+        <View className="h-4 w-16 bg-gray-200 rounded" />
+      </View>
+      <View className="flex-row justify-between">
+        <View className="h-4 w-28 bg-gray-200 rounded" />
+        <View className="h-4 w-36 bg-gray-200 rounded" />
+      </View>
+      <View className="flex-row justify-between">
+        <View className="h-4 w-24 bg-gray-200 rounded" />
+        <View className="h-4 w-32 bg-gray-200 rounded" />
+      </View>
+    </View>
+
+    <View className="h-48 bg-gray-200 rounded-lg mb-4" />
+
+    <View className="flex-row justify-between">
+      <View className="h-10 w-1/2 bg-gray-200 rounded-lg mr-2" />
+      <View className="h-10 w-1/2 bg-gray-200 rounded-lg ml-2" />
+    </View>
+  </View>
+);
+
 const DriverApplications = () => {
   const { user } = useUser();
+  const { language } = useLanguage();
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -214,11 +256,11 @@ const DriverApplications = () => {
   const FilterButton = ({ title, value }: { title: string; value: typeof filter }) => (
     <TouchableOpacity
       onPress={() => setFilter(value)}
-      className={`px-4 py-2 rounded-full mr-2 ${
+      className={`px-4 py-2 rounded-full ${language === 'ar' ? 'ml-2' : 'mr-2'} ${
         filter === value ? 'bg-orange-500' : 'bg-gray-200'
       }`}
     >
-      <Text className={filter === value ? 'text-white font-semibold' : 'text-gray-700'}>
+      <Text className={`${filter === value ? 'text-white' : 'text-gray-700'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
         {title}
       </Text>
     </TouchableOpacity>
@@ -227,11 +269,11 @@ const DriverApplications = () => {
   const SortButton = ({ title, value }: { title: string; value: typeof sortBy }) => (
     <TouchableOpacity
       onPress={() => setSortBy(value)}
-      className={`px-4 py-2 rounded-full mr-2 ${
+      className={`px-4 py-2 rounded-full ${language === 'ar' ? 'ml-2' : 'mr-2'} ${
         sortBy === value ? 'bg-blue-500' : 'bg-gray-200'
       }`}
     >
-      <Text className={sortBy === value ? 'text-white font-semibold' : 'text-gray-700'}>
+      <Text className={`${sortBy === value ? 'text-white' : 'text-gray-700'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
         {title}
       </Text>
     </TouchableOpacity>
@@ -241,44 +283,65 @@ const DriverApplications = () => {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#F97316" />
-        <Text className="text-lg font-semibold mt-4">Checking permissions...</Text>
+        <Text className={`text-lg mt-4 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+          {language === 'ar' ? 'جاري التحقق من الصلاحيات...' : 'Checking permissions...'}
+        </Text>
       </SafeAreaView>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#F97316" />
-        <Text className="text-lg font-semibold mt-4">Loading applications...</Text>
+      <SafeAreaView className="flex-1 bg-white">
+        <Header 
+          showProfileImage={false} 
+          showSideMenu={false} 
+          title={language === 'ar' ? 'طلبات السائقين' : 'Driver Applications'} 
+        />
+        
+        <View className="px-4 py-4">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ flexDirection: language === 'ar' ? 'row-reverse' : 'row' }}>
+            <View className="h-10 w-20 bg-gray-200 rounded-full mr-2" />
+            <View className="h-10 w-24 bg-gray-200 rounded-full mr-2" />
+            <View className="h-10 w-28 bg-gray-200 rounded-full mr-2" />
+            <View className="h-10 w-24 bg-gray-200 rounded-full" />
+          </ScrollView>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ flexDirection: language === 'ar' ? 'row-reverse' : 'row' }}>
+            <View className="h-10 w-32 bg-gray-200 rounded-full mr-2" />
+            <View className="h-10 w-28 bg-gray-200 rounded-full" />
+          </ScrollView>
+        </View>
+
+        <ScrollView className="flex-1 px-4">
+          <SkeletonApplicationCard />
+          <SkeletonApplicationCard />
+          <SkeletonApplicationCard />
+          <SkeletonApplicationCard />
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
+      <Header 
+        showProfileImage={false} 
+        showSideMenu={false} 
+        title={language === 'ar' ? 'طلبات السائقين' : 'Driver Applications'} 
+      />
+      
       <View className="px-4 py-4">
-        <View className="flex-row items-center justify-between mb-4">
-          <TouchableOpacity 
-            onPress={() => router.back()}
-            className="bg-gray-100 p-2 rounded-full"
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#6B7280" />
-          </TouchableOpacity>
-          <Text className="text-2xl font-bold">Driver Applications</Text>
-          <View className="w-10" />
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-          <FilterButton title="All" value="all" />
-          <FilterButton title="Pending" value="pending" />
-          <FilterButton title="Approved" value="approved" />
-          <FilterButton title="Rejected" value="rejected" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ flexDirection: language === 'ar' ? 'row-reverse' : 'row' }}>
+          <FilterButton title={language === 'ar' ? 'الكل' : 'All'} value="all" />
+          <FilterButton title={language === 'ar' ? 'قيد الانتظار' : 'Pending'} value="pending" />
+          <FilterButton title={language === 'ar' ? 'تمت الموافقة' : 'Approved'} value="approved" />
+          <FilterButton title={language === 'ar' ? 'مرفوض' : 'Rejected'} value="rejected" />
         </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-          <SortButton title="Sort by Date" value="date" />
-          <SortButton title="Sort by Name" value="name" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ flexDirection: language === 'ar' ? 'row-reverse' : 'row' }}>
+          <SortButton title={language === 'ar' ? 'ترتيب حسب التاريخ' : 'Sort by Date'} value="date" />
+          <SortButton title={language === 'ar' ? 'ترتيب حسب الاسم' : 'Sort by Name'} value="name" />
         </ScrollView>
       </View>
 
@@ -286,7 +349,9 @@ const DriverApplications = () => {
         {applications.length === 0 ? (
           <View className="flex-1 items-center justify-center py-8">
             <MaterialCommunityIcons name="file-document-outline" size={48} color="#9CA3AF" />
-            <Text className="text-lg text-gray-500 mt-4">No applications found</Text>
+            <Text className={`text-lg text-gray-500 mt-4 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+              {language === 'ar' ? 'لا توجد طلبات' : 'No applications found'}
+            </Text>
           </View>
         ) : (
           applications.map((application) => (
@@ -294,7 +359,7 @@ const DriverApplications = () => {
               key={application.id}
               className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100"
             >
-              <View className="flex-row items-center mb-4">
+              <View className={`flex-row items-center mb-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <TouchableOpacity
                   onPress={() => {
                     setSelectedImage(application.profile_image_url);
@@ -306,32 +371,50 @@ const DriverApplications = () => {
                     className="w-16 h-16 rounded-full"
                   />
                 </TouchableOpacity>
-                <View className="flex-1 ml-4">
-                  <Text className="text-lg font-bold">
+                <View className={`flex-1 ${language === 'ar' ? 'mr-4' : 'ml-4'}`}>
+                  <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
                     {application.user_name}
                   </Text>
-                  <Text className="text-gray-500">{application.user_email}</Text>
-                  <Text className="text-gray-500">{application.phone_number}</Text>
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'}`}>
+                    {application.user_email}
+                  </Text>
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'}`}>
+                    {application.phone_number}
+                  </Text>
                 </View>
               </View>
 
               <View className="space-y-2 mb-4">
                 <View className="flex-row justify-between">
-                  <Text className="text-gray-500">Car Type:</Text>
-                  <Text className="font-medium">{application.car_type}</Text>
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'}`}>
+                    {language === 'ar' ? 'نوع السيارة:' : 'Car Type:'}
+                  </Text>
+                  <Text className={`${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {application.car_type}
+                  </Text>
                 </View>
                 <View className="flex-row justify-between">
-                  <Text className="text-gray-500">Seats:</Text>
-                  <Text className="font-medium">{application.car_seats}</Text>
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'}`}>
+                    {language === 'ar' ? 'المقاعد:' : 'Seats:'}
+                  </Text>
+                  <Text className={`${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {application.car_seats}
+                  </Text>
                 </View>
                 <View className="flex-row justify-between">
-                  <Text className="text-gray-500">License Number:</Text>
-                  <Text className="font-medium">{application.license_number || 'Not provided'}</Text>
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'}`}>
+                    {language === 'ar' ? 'رقم الترخيص:' : 'License Number:'}
+                  </Text>
+                  <Text className={`${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {application.license_number || (language === 'ar' ? 'غير متوفر' : 'Not provided')}
+                  </Text>
                 </View>
                 <View className="flex-row justify-between">
-                  <Text className="text-gray-500">Applied on:</Text>
-                  <Text className="font-medium">
-                    {new Date(application.created_at).toLocaleDateString()}
+                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular' : 'font-JakartaRegular'}`}>
+                    {language === 'ar' ? 'تاريخ التقديم:' : 'Applied on:'}
+                  </Text>
+                  <Text className={`${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {new Date(application.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US')}
                   </Text>
                 </View>
               </View>
@@ -356,16 +439,16 @@ const DriverApplications = () => {
               {application.status === 'pending' && (
                 <View className="flex-row justify-between">
                   <CustomButton
-                    title="Reject"
+                    title={language === 'ar' ? 'رفض' : 'Reject'}
                     onPress={() => handleApplication(application.id, 'reject')}
                     bgVariant="danger"
-                    className="flex-1 mr-2"
+                    className={`flex-1 ${language === 'ar' ? 'ml-2' : 'mr-2'}`}
                   />
                   <CustomButton
-                    title="Approve"
+                    title={language === 'ar' ? 'موافقة' : 'Approve'}
                     onPress={() => handleApplication(application.id, 'approve')}
                     bgVariant="success"
-                    className="flex-1 ml-2"
+                    className={`flex-1 ${language === 'ar' ? 'mr-2' : 'ml-2'}`}
                   />
                 </View>
               )}
@@ -382,36 +465,36 @@ const DriverApplications = () => {
       >
         <View className="flex-1 bg-black/50 justify-center items-center">
           <View className="bg-white w-11/12 rounded-xl p-6">
-            <Text className="text-xl font-bold mb-4">
-              Rejection Reason
+            <Text className={`text-xl ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} mb-4`}>
+              {language === 'ar' ? 'سبب الرفض' : 'Rejection Reason'}
             </Text>
             
             <TextInput
               value={rejectionReason}
               onChangeText={setRejectionReason}
-              placeholder="Enter rejection reason"
+              placeholder={language === 'ar' ? 'أدخل سبب الرفض' : 'Enter rejection reason'}
               multiline
               numberOfLines={4}
-              className="border border-gray-300 rounded-lg p-3 mb-4"
+              className={`border border-gray-300 rounded-lg p-3 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
               textAlignVertical="top"
             />
 
             <View className="flex-row justify-between">
               <CustomButton
-                title="Cancel"
+                title={language === 'ar' ? 'إلغاء' : 'Cancel'}
                 onPress={() => {
                   setShowRejectionModal(false);
                   setRejectionReason('');
                   setSelectedApplication(null);
                 }}
                 bgVariant="outline"
-                className="flex-1 mr-2"
+                className={`flex-1 ${language === 'ar' ? 'ml-2' : 'mr-2'}`}
               />
               <CustomButton
-                title="Reject"
+                title={language === 'ar' ? 'رفض' : 'Reject'}
                 onPress={handleReject}
                 bgVariant="danger"
-                className="flex-1 ml-2"
+                className={`flex-1 ${language === 'ar' ? 'mr-2' : 'ml-2'}`}
               />
             </View>
           </View>

@@ -3,6 +3,7 @@ import { ActivityIndicator, View, Platform, TouchableOpacity, Image } from "reac
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
+import { MaterialIcons } from "@expo/vector-icons";
 
 import { icons } from "@/constants";
 import { calculateRegion } from "@/lib/map";
@@ -28,11 +29,12 @@ interface RideMapProps {
   destination?: Location;
   waypoints?: Waypoint[];
   onTargetPress?: () => void;
+  passengerLocations?: Record<string, { latitude: number; longitude: number; name: string }>;
 }
 
 const directionsAPI = process.env.EXPO_PUBLIC_DIRECTIONS_API_KEY;
 
-const RideMap = ({ origin, destination, waypoints = [], onTargetPress }: RideMapProps) => {
+const RideMap = ({ origin, destination, waypoints = [], onTargetPress, passengerLocations = {} }: RideMapProps) => {
   const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const mapRef = useRef<MapView | null>(null);
 
@@ -176,6 +178,23 @@ const RideMap = ({ origin, destination, waypoints = [], onTargetPress }: RideMap
             }}
           />
         )}
+
+        {/* Passenger Location Markers */}
+        {Object.entries(passengerLocations).map(([userId, location]) => (
+          <Marker
+            key={`passenger-${userId}`}
+            coordinate={{
+              latitude: location.latitude,
+              longitude: location.longitude,
+            }}
+            title={location.name}
+            description="موقع الراكب"
+          >
+            <View className="bg-white p-2 rounded-full shadow-md">
+              <MaterialIcons name="person" size={24} color="#0286FF" />
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
       {/* زر الذهاب للموقع الحالي */}

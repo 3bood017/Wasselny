@@ -7,6 +7,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useLanguage } from '@/context/LanguageContext';
+import Header from '@/components/Header';
 
 interface DashboardStats {
   totalDrivers: number;
@@ -18,6 +19,35 @@ interface DashboardStats {
 }
 
 type IconName = 'account-group' | 'car' | 'clock-outline' | 'map-marker-path' | 'account-cog' | 'chart-bar' | 'message-text' | 'help-circle';
+
+const SkeletonStatCard = () => (
+  <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+    <View className="flex-row items-center justify-between">
+      <View>
+        <View className="h-8 w-20 bg-gray-200 rounded-lg mb-2" />
+        <View className="h-4 w-24 bg-gray-200 rounded" />
+      </View>
+      <View className="bg-gray-200 p-3 rounded-full">
+        <View className="w-6 h-6 rounded-full bg-gray-300" />
+      </View>
+    </View>
+  </View>
+);
+
+const SkeletonQuickActionCard = () => (
+  <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+    <View className="flex-row items-center">
+      <View className="bg-gray-200 p-3 rounded-full mr-4">
+        <View className="w-6 h-6 rounded-full bg-gray-300" />
+      </View>
+      <View className="flex-1">
+        <View className="h-6 w-32 bg-gray-200 rounded mb-2" />
+        <View className="h-4 w-48 bg-gray-200 rounded" />
+      </View>
+      <View className="w-6 h-6 bg-gray-200 rounded-full" />
+    </View>
+  </View>
+);
 
 const AdminDashboard = () => {
   const { user } = useUser();
@@ -144,52 +174,73 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#F97316" />
-        <Text className="text-gray-600 mt-4">Loading dashboard...</Text>
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <Header 
+          showProfileImage={false} 
+          showSideMenu={false} 
+          title={language === 'ar' ? 'لوحة التحكم' : 'Admin Dashboard'} 
+        />
+        <ScrollView className="flex-1 px-4">
+          <View className="py-4">
+            {/* Stats Section Skeleton */}
+            <View className="mb-6">
+              <View className="h-6 w-24 bg-gray-200 rounded mb-4" />
+              <SkeletonStatCard />
+              <SkeletonStatCard />
+              <SkeletonStatCard />
+              <SkeletonStatCard />
+            </View>
+
+            {/* Quick Actions Section Skeleton */}
+            <View className="mb-6">
+              <View className="h-6 w-24 bg-gray-200 rounded mb-4" />
+              <SkeletonQuickActionCard />
+              <SkeletonQuickActionCard />
+              <SkeletonQuickActionCard />
+              <SkeletonQuickActionCard />
+              <SkeletonQuickActionCard />
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
+      <Header 
+        showProfileImage={false} 
+        showSideMenu={false} 
+        title={language === 'ar' ? 'لوحة التحكم' : 'Admin Dashboard'} 
+      />
+      
       <ScrollView className="flex-1 px-4">
-      <View className="py-4">
-          {/* Header */}
-          <View className="flex-row items-center justify-between mb-6">
-            <TouchableOpacity 
-              onPress={() => router.back()}
-              className="bg-gray-100 p-2 rounded-full"
-            >
-              <MaterialCommunityIcons name="arrow-left" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            <Text className="text-2xl font-bold">Admin Dashboard</Text>
-            <View className="w-10" />
-          </View>
-          
+        <View className="py-4">
           {/* Stats Section */}
           <View className="mb-6">
-            <Text className="text-lg font-semibold mb-4">Statistics</Text>
+            <Text className={`text-lg mb-4 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+              {language === 'ar' ? 'الإحصائيات' : 'Statistics'}
+            </Text>
             <StatCard 
-              title="Total Users" 
+              title={language === 'ar' ? 'إجمالي المستخدمين' : 'Total Users'} 
               value={stats.totalUsers} 
               icon="account-group" 
               color="blue" 
             />
             <StatCard 
-              title="Active Drivers" 
+              title={language === 'ar' ? 'السائقين النشطين' : 'Active Drivers'} 
               value={stats.activeDrivers} 
               icon="car" 
               color="green" 
             />
             <StatCard 
-              title="Pending Applications" 
+              title={language === 'ar' ? 'الطلبات المعلقة' : 'Pending Applications'} 
               value={stats.pendingApplications} 
               icon="clock-outline" 
               color="red" 
             />
             <StatCard 
-              title="Total Rides" 
+              title={language === 'ar' ? 'إجمالي الرحلات' : 'Total Rides'} 
               value={stats.totalRides} 
               icon="map-marker-path" 
               color="purple" 
@@ -198,39 +249,41 @@ const AdminDashboard = () => {
 
           {/* Quick Actions Section */}
           <View className="mb-6">
-            <Text className="text-lg font-semibold mb-4">Quick Actions</Text>
+            <Text className={`text-lg mb-4 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+              {language === 'ar' ? 'إجراءات سريعة' : 'Quick Actions'}
+            </Text>
             <QuickActionCard 
-              title="Support Messages" 
-              description="View and manage user support messages"
+              title={language === 'ar' ? 'رسائل الدعم' : 'Support Messages'} 
+              description={language === 'ar' ? 'عرض وإدارة رسائل دعم المستخدمين' : 'View and manage user support messages'}
               icon="message-text"
               color="yellow"
               badge={stats.pendingSupport}
               onPress={() => router.push('/(root)/admin/support-messages' as any)}
             />
             <QuickActionCard 
-              title="Driver Applications" 
-              description="Review and manage driver applications"
+              title={language === 'ar' ? 'طلبات السائقين' : 'Driver Applications'} 
+              description={language === 'ar' ? 'مراجعة وإدارة طلبات السائقين' : 'Review and manage driver applications'}
               icon="car"
               color="red"
               onPress={() => router.push('/(root)/admin/driverApplications' as any)}
             />
             <QuickActionCard 
-              title="User Management" 
-              description="Manage user accounts and permissions"
+              title={language === 'ar' ? 'إدارة المستخدمين' : 'User Management'} 
+              description={language === 'ar' ? 'إدارة حسابات المستخدمين والصلاحيات' : 'Manage user accounts and permissions'}
               icon="account-cog"
               color="blue"
               onPress={() => router.push('/(root)/admin/users' as any)}
             />
             <QuickActionCard 
-              title="Ride Management" 
-              description="Monitor and manage active rides"
+              title={language === 'ar' ? 'إدارة الرحلات' : 'Ride Management'} 
+              description={language === 'ar' ? 'مراقبة وإدارة الرحلات النشطة' : 'Monitor and manage active rides'}
               icon="map-marker-path"
               color="purple"
               onPress={() => router.push('/(root)/admin/rides' as any)}
             />
             <QuickActionCard 
-              title="Reports" 
-              description="View system reports and analytics"
+              title={language === 'ar' ? 'التقارير' : 'Reports'} 
+              description={language === 'ar' ? 'عرض تقارير وتحليلات النظام' : 'View system reports and analytics'}
               icon="chart-bar"
               color="green"
               onPress={() => router.push('/(root)/admin/reports' as any)}

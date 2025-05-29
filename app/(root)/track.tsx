@@ -5,7 +5,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
   }
   
   import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-  import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, Alert, FlatList, Image, Dimensions, Modal, TextInput } from 'react-native';
+  import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator, Alert, FlatList, Image, Dimensions, Modal, TextInput, RefreshControl } from 'react-native';
   import { SafeAreaView } from 'react-native-safe-area-context';
   import { useUser } from '@clerk/clerk-expo';
   import { router } from 'expo-router';
@@ -19,6 +19,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
   import { icons } from '@/constants';
   import { GestureHandlerRootView } from 'react-native-gesture-handler';
   import * as Haptics from 'expo-haptics';
+import Header from '@/components/Header';
   
   // Types
   interface AppUser {
@@ -67,6 +68,9 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
     const [trackingInterval, setTrackingInterval] = useState<NodeJS.Timeout | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showMyShares, setShowMyShares] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [stoppingShares, setStoppingShares] = useState<Set<string>>(new Set());
+    const [isUpdatingAll, setIsUpdatingAll] = useState(false);
   
     // Timer for updating times
     useEffect(() => {
@@ -80,6 +84,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
     useEffect(() => {
       const getLocation = async () => {
         try {
+          setIsInitialLoading(true);
           let { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== 'granted') {
             Alert.alert(
@@ -100,6 +105,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
         } catch (error) {
           console.error('Error getting location:', error);
         } finally {
+          setIsInitialLoading(false);
           setLoading(false);
         }
       };
@@ -202,8 +208,17 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
           const usersSnapshot = await getDocs(usersRef);
           const usersList: AppUser[] = [];
           
+          // Get all active shares where current user is the recipient
+          const sharesQuery = query(
+            collection(db, 'location_sharing'),
+            where('recipient_id', '==', user.id),
+            where('is_active', '==', true)
+          );
+          const sharesSnapshot = await getDocs(sharesQuery);
+          const activeSharers = new Set(sharesSnapshot.docs.map(doc => doc.data().sharer_id));
+          
           usersSnapshot.forEach(doc => {
-            if (doc.id !== user.id) {
+            if (doc.id !== user.id && !activeSharers.has(doc.id)) {
               const userData = doc.data();
               usersList.push({
                 id: doc.id,
@@ -211,8 +226,8 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                 email: userData.email,
                 profile_image: userData.profile_image_url
               });
-                      }
-                    });
+            }
+          });
           
           setAppUsers(usersList);
           setFilteredUsers(usersList);
@@ -257,11 +272,21 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
     // Stop sharing location with a recipient
     const stopSharing = async (docId: string) => {
       try {
+        // Add the share to stopping state
+        setStoppingShares(prev => new Set(prev).add(docId));
+        
         await updateDoc(doc(db, 'location_sharing', docId), { is_active: false });
         Alert.alert('Success', 'Location sharing stopped');
       } catch (error) {
         console.error('Error stopping sharing:', error);
         Alert.alert('Error', 'Could not stop sharing location');
+      } finally {
+        // Remove the share from stopping state
+        setStoppingShares(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(docId);
+          return newSet;
+        });
       }
     };
   
@@ -651,24 +676,80 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                   if (selectedUser) {
                     startLocationSharing();
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    
                   }
                 }}
-                
-                disabled={!selectedUser}
+                disabled={!selectedUser || isRefreshing}
               >
-                <Text style={[
-                  styles.confirmButtonText,
-                  !selectedUser && styles.disabledButtonText
-                ]}>
-                  {isRTL ? 'بدء المشاركة' : 'Start Sharing'}
-                  
-                </Text>
+                {isRefreshing ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={[
+                    styles.confirmButtonText,
+                    !selectedUser && styles.disabledButtonText
+                  ]}>
+                    {isRTL ? 'بدء المشاركة' : 'Start Sharing'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       );
+    };
+  
+    // Function to update location for all shared users
+    const updateAllSharedLocations = async () => {
+      if (!user?.id || myShares.length === 0) return;
+      
+      try {
+        setIsUpdatingAll(true);
+        
+        // Get current location
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced
+        });
+        
+        // Update location for each active share
+        const updatePromises = myShares.map(share => 
+          updateDoc(doc(db, 'location_sharing', share.docId), {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            last_updated: new Date().toISOString()
+          })
+        );
+        
+        await Promise.all(updatePromises);
+        
+        // Update user's own location state
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude
+        });
+        
+        // Center map on new location
+        if (mapRef.current) {
+          mapRef.current.animateToRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01
+          }, 1000);
+        }
+        
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          isRTL ? 'تم التحديث' : 'Updated',
+          isRTL ? 'تم تحديث موقعك لجميع المستخدمين' : 'Your location has been updated for all users'
+        );
+      } catch (error) {
+        console.error('Error updating all locations:', error);
+        Alert.alert(
+          isRTL ? 'خطأ' : 'Error',
+          isRTL ? 'فشل في تحديث الموقع' : 'Failed to update location'
+        );
+      } finally {
+        setIsUpdatingAll(false);
+      }
     };
   
     // Render my shares modal
@@ -687,6 +768,22 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                 <AntDesign name="close" size={24} color="#374151" />
               </TouchableOpacity>
             </View>
+            
+            {myShares.length > 0 && (
+              <TouchableOpacity
+                style={[styles.updateAllButton, isUpdatingAll && styles.updateAllButtonDisabled]}
+                onPress={updateAllSharedLocations}
+                disabled={isUpdatingAll}
+              >
+                {isUpdatingAll ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.updateAllButtonText}>
+                    {isRTL ? 'تحديث الموقع للجميع' : 'Update Location for All'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
             
             <FlatList
               data={myShares}
@@ -713,13 +810,21 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={styles.stopButton}
+                    style={[
+                      styles.stopButton,
+                      stoppingShares.has(item.docId) && styles.stopButtonDisabled
+                    ]}
                     onPress={() => {
                       stopSharing(item.docId);
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     }}
+                    disabled={stoppingShares.has(item.docId)}
                   >
-                    <Text style={styles.stopButtonText}>Stop</Text>
+                    {stoppingShares.has(item.docId) ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={styles.stopButtonText}>Stop</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               )}
@@ -737,6 +842,42 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
       );
     };
   
+    if (isInitialLoading) {
+      return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaView className="flex-1 bg-white">
+            {/* Header */}
+            <View className="flex-row justify-between items-center p-4 border-b border-gray-200">
+              <View className="w-6 h-6 rounded-full bg-gray-200" />
+              <View className="w-32 h-6 bg-gray-200 rounded" />
+              <View className="w-20 h-6 bg-gray-200 rounded" />
+            </View>
+
+            {/* Map Skeleton */}
+            <View className="flex-1 bg-gray-100" />
+
+            {/* Bottom Sheet with Skeleton */}
+            <View className="bg-white rounded-t-3xl p-4">
+              <View className="w-40 h-6 bg-gray-200 rounded mb-4" />
+              <View className="space-y-4">
+                {[1, 2, 3].map((_, index) => (
+                  <View key={index} className="flex-row items-center p-4 border-b border-gray-100">
+                    <View className="w-10 h-10 rounded-full bg-gray-200" />
+                    <View className="flex-1 ml-4">
+                      <View className="h-4 bg-gray-200 rounded w-32 mb-2" />
+                      <View className="h-3 bg-gray-200 rounded w-48 mb-2" />
+                      <View className="h-3 bg-gray-200 rounded w-24" />
+                    </View>
+                    <View className="w-16 h-8 bg-gray-200 rounded-full" />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      );
+    }
+  
     if (loading) {
       return (
         <View className="flex-1 justify-center items-center bg-white">
@@ -749,15 +890,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView className="flex-1 bg-white">
           {/* Header */}
-          <View className="flex-row justify-between items-center p-4 border-b border-gray-200">
-            <TouchableOpacity onPress={() => router.back()}>
-              <MaterialIcons name="arrow-back" size={24} color="#374151" />
-            </TouchableOpacity>
-            <Text className="text-xl font-bold">Location Tracking</Text>
-            <TouchableOpacity onPress={() => setActiveModal('shares')}>
-              <Text className="text-orange-500 font-bold">My Shares</Text>
-            </TouchableOpacity>
-          </View>
+          <Header title={language === 'ar' ? 'تتبع الموقع' : 'Location Tracking' } showProfileImage={false} showSideMenu={false} />
   
           {/* Map View */}
           <View className="flex-1">
@@ -801,7 +934,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
             {/* Map Actions */}
             <View className="absolute top-4 right-4 space-y-2 z-10">
               <TouchableOpacity
-                className="bg-white p-3 rounded-full shadow-md"
+                className="bg-white w-14 h-14 rounded-full items-center justify-center shadow-lg"
                 onPress={fetchUserLocation}
                 disabled={isRefreshing}
               >
@@ -811,21 +944,45 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                   <MaterialIcons name="my-location" size={24} color="#f97316" />
                 )}
               </TouchableOpacity>
+
+              {/* My Shares Button */}
+              <TouchableOpacity
+                className="bg-gray-600 w-14 h-14 rounded-full items-center justify-center shadow-lg"
+                onPress={() => setActiveModal('shares')}
+                style={{
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: 4,
+                  zIndex: 10
+                }}
+              >
+                <MaterialIcons name="share" size={24} color="#fff" />
+              </TouchableOpacity>
             </View>
-  
+
             {/* Floating Action Button for sharing location */}
             <TouchableOpacity
-              style={styles.fab}
+              className="absolute bottom-6 right-6 w-16 h-16 bg-orange-500 rounded-full items-center justify-center shadow-lg"
               onPress={() => {
                 setSelectedUser(null);
                 setSearchQuery('');
                 setFilteredUsers(appUsers);
                 setActiveModal('search');
               }}
+              style={{
+                shadowColor: '#f97316',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 8,
+                zIndex: 10
+              }}
             >
-              <MaterialIcons name="person-add" size={28} color="#fff" />
+              <MaterialIcons name="person-add" size={32} color="#fff" />
             </TouchableOpacity>
-  
+
             {/* Location sharing status */}
             {isLocationSharing && (
               <View className="absolute bottom-32 left-4 right-4 bg-white p-3 rounded-lg shadow-md">
@@ -846,7 +1003,21 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
           >
             <View style={styles.bottomSheetContainer}>
               <Text style={styles.bottomSheetTitle}>Location Requests</Text>
-              {trackRequests.length === 0 ? (
+              {loading ? (
+                <View style={styles.bottomSheetContent}>
+                  {[1, 2, 3].map((_, index) => (
+                    <View key={index} className="flex-row items-center p-4 border-b border-gray-100">
+                      <View className="w-10 h-10 rounded-full bg-gray-200" />
+                      <View className="flex-1 ml-4">
+                        <View className="h-4 bg-gray-200 rounded w-32 mb-2" />
+                        <View className="h-3 bg-gray-200 rounded w-48 mb-2" />
+                        <View className="h-3 bg-gray-200 rounded w-24" />
+                      </View>
+                      <View className="w-16 h-8 bg-gray-200 rounded-full" />
+                    </View>
+                  ))}
+                </View>
+              ) : trackRequests.length === 0 ? (
                 <View style={styles.emptyListContainer}>
                   <Text style={styles.emptyListText}>No active location requests</Text>
                 </View>
@@ -859,6 +1030,17 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
                   initialNumToRender={5}
                   maxToRenderPerBatch={10}
                   windowSize={5}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={isRefreshing}
+                      onRefresh={fetchUserLocation}
+                      colors={['#f97316']}
+                      tintColor="#f97316"
+                      title={isRTL ? 'جاري التحديث...' : 'Refreshing...'}
+                      titleColor="#f97316"
+                      progressViewOffset={20}
+                    />
+                  }
                 />
               )}
             </View>
@@ -1063,7 +1245,14 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
       backgroundColor: '#ef4444',
       paddingVertical: 8,
       paddingHorizontal: 16,
-      borderRadius: 8
+      borderRadius: 8,
+      minWidth: 80,
+      minHeight: 36,
+      justifyContent: 'center',
+      alignItems: 'center'
+    },
+    stopButtonDisabled: {
+      backgroundColor: '#fca5a5'
     },
     stopButtonText: {
       color: 'white',
@@ -1130,5 +1319,98 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
       paddingHorizontal: 12,
       backgroundColor: '#f3f4f6',
       borderRadius: 16
+    },
+    // Skeleton styles
+    skeletonItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f3f4f6'
+    },
+    skeletonAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#e5e7eb',
+      opacity: 0.7
+    },
+    skeletonContent: {
+      flex: 1,
+      marginLeft: 12
+    },
+    skeletonName: {
+      height: 16,
+      width: '60%',
+      backgroundColor: '#e5e7eb',
+      borderRadius: 4,
+      marginBottom: 8,
+      opacity: 0.7
+    },
+    skeletonEmail: {
+      height: 14,
+      width: '80%',
+      backgroundColor: '#e5e7eb',
+      borderRadius: 4,
+      marginBottom: 8,
+      opacity: 0.7
+    },
+    skeletonTime: {
+      height: 12,
+      width: '40%',
+      backgroundColor: '#e5e7eb',
+      borderRadius: 4,
+      opacity: 0.7
+    },
+    skeletonButton: {
+      width: 60,
+      height: 32,
+      backgroundColor: '#e5e7eb',
+      borderRadius: 16,
+      opacity: 0.7
+    },
+    skeletonHeaderButton: {
+      width: 24,
+      height: 24,
+      backgroundColor: '#e5e7eb',
+      borderRadius: 12,
+      opacity: 0.7
+    },
+    skeletonHeaderTitle: {
+      width: 150,
+      height: 24,
+      backgroundColor: '#e5e7eb',
+      borderRadius: 4,
+      opacity: 0.7
+    },
+    skeletonBottomSheetTitle: {
+      height: 24,
+      width: 200,
+      backgroundColor: '#e5e7eb',
+      borderRadius: 4,
+      marginBottom: 16,
+      marginHorizontal: 16,
+      marginTop: 16,
+      opacity: 0.7
+    },
+    updateAllButton: {
+      backgroundColor: '#f97316',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44
+    },
+    updateAllButtonDisabled: {
+      backgroundColor: '#fb923c'
+    },
+    updateAllButtonText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: 16
     }
   }); 

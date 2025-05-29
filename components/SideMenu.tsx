@@ -36,12 +36,12 @@ export default function SideMenu(props: DrawerContentComponentProps) {
         const q = query(locationsRef, where('userId', '==', user.id));
         
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const locations = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Array<{id: string, name: string, isDefault: boolean}>;
-          
-          setSavedLocations(locations);
+        const locations = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Array<{id: string, name: string, isDefault: boolean}>;
+        
+        setSavedLocations(locations);
         });
 
         return () => unsubscribe();
@@ -140,7 +140,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
 
   return (
     <View className="flex-1 mt-10 bg-white">
-      {/* Fixed Profile Section */}
+      {/* Profile Section */}
       <View className="bg-white">
         <View className="mt-2 mb-6 items-center w-full">
           <TouchableOpacity 
@@ -169,7 +169,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
         <View className="h-[6px] w-full bg-orange-100 mb-4" />
       </View>
 
-      {/* Scrollable Content */}
+      {/* Menu Items */}
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -180,9 +180,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
         }}
         className="rounded-tr-[2px] rounded-br-[22px]"
       >
-        {/* Account Section */}
-        <Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>{t.account}</Text>
-        
+        {/* Edit Profile */}
         <TouchableOpacity
           onPress={() => router.push('/(root)/profilePageEdit')}
           activeOpacity={0.7}
@@ -194,6 +192,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.editProfile}</Text>
         </TouchableOpacity>
 
+        {/* Language */}
         <TouchableOpacity
           onPress={toggleLanguage}
           activeOpacity={0.7}
@@ -206,8 +205,8 @@ export default function SideMenu(props: DrawerContentComponentProps) {
             <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.language}</Text>
             <View className={`flex-row items-center ${isRTL ? 'flex-row-reverse' : ''}`}>
               <Text className={`text-gray-500 font-CairoRegular text-sm ${isRTL ? 'text-right ml-2' : 'text-left mr-2'}`}>
-                {language === 'en' ? 'العربية' : 'English'}
-              </Text>
+              {language === 'en' ? 'العربية' : 'English'}
+            </Text>
               <MaterialIcons 
                 name="swap-horiz" 
                 size={16} 
@@ -218,6 +217,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           </View>
         </TouchableOpacity>
 
+        {/* Location */}
         <TouchableOpacity
           onPress={() => router.push('/(root)/location')}
           activeOpacity={0.7}
@@ -225,25 +225,19 @@ export default function SideMenu(props: DrawerContentComponentProps) {
         >
           <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
             <Image source={icons.pin} className='w-5 h-5' tintColor={"white"} resizeMode='contain'/>
-            {/* <MaterialIcons name="location-on" size={22} color="#fff" /> */}
           </View>
           <View className="flex-1">
-            <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.location}</Text>
-            <Text className={`text-gray-500 font-CairoRegular text-[13px] mt-0.5 ${isRTL ? 'text-right' : 'text-left'}`}>
+            <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.location}</Text>
+            <Text className={`text-gray-500 font-CairoRegular text-sm ${isRTL ? 'text-right' : 'text-left'}`}>
               {savedLocations.find(loc => loc.isDefault)?.name || userAddress || t.currentLocation}
             </Text>
           </View>
         </TouchableOpacity>
 
         {/* Divider */}
-        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
-        
+        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 15 }} />
 
-        {/* Tracking Section */}
-        <Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>
-          {language === 'ar' ? 'التتبع' : 'Tracking'}
-        </Text>
-        
+        {/* Track */}
         <TouchableOpacity
           onPress={() => {
             router.push('/(root)/track');
@@ -255,88 +249,69 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
             <MaterialIcons name="location-searching" size={22} color="#fff" />
           </View>
-          <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+          <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
             {language === 'ar' ? 'تتبع الرحلات' : 'Track Rides'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => {
-            router.push('/(root)/track-requests');
-            props.navigation.closeDrawer();
-          }}
-          activeOpacity={0.7}
-          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
-        >
-          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-            <MaterialIcons name="notifications" size={22} color="#fff" />
-          </View>
-          <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'طلبات التتبع' : 'Track Requests'}
-          </Text>
-        </TouchableOpacity>
+            onPress={() => {
+              router.push('/(root)/my-shares');
+              props.navigation.closeDrawer();
+            }}
+            activeOpacity={0.7}
+            className={`flex-row items-center min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+          >
+            <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+              <MaterialIcons name="qr-code-scanner" size={22} color="#fff" />
+            </View>
+            <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+              {language === 'ar' ? ' مشاركة الموقع' : 'Share Location'}
+            </Text>
+          </TouchableOpacity>
+
+        {/* New Rides - Only for drivers */}
+        {isDriver && (
         <TouchableOpacity
           onPress={() => {
-            router.push('/(root)/my-shares');
+              router.push('/(root)/create-ride');
             props.navigation.closeDrawer();
           }}
           activeOpacity={0.7}
           className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
         >
           <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-            <MaterialIcons name="share" size={22} color="#fff" />
+              <MaterialIcons name="add-circle" size={22} color="#fff" />
           </View>
-          <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'مشاركاتي' : 'My Shares'}
+            <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+              {language === 'ar' ? 'إنشاء رحلة' : 'Create Ride'}
           </Text>
         </TouchableOpacity>
-        {/* Divider */}
-        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
-
-        {/* Rides Section - Only show for drivers */}
-        {isDriver && (
-          <>
-            <Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>
-              {language === 'ar' ? 'الرحلات' : 'Rides'}
-            </Text>
-            
-            <TouchableOpacity
-              onPress={() => {
-                router.push('/(root)/(tabs)/rides');
-                props.navigation.closeDrawer();
-              }}
-              activeOpacity={0.7}
-              className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
-            >
-              <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-                <MaterialIcons name="directions-car" size={22} color="#fff" />
-              </View>
-              <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
-                {language === 'ar' ? 'رحلاتي' : 'My Rides'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                router.push('/(root)/create-ride');
-                props.navigation.closeDrawer();
-              }}
-              activeOpacity={0.7}
-              className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
-            >
-              <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-                <MaterialIcons name="add-circle" size={22} color="#fff" />
-              </View>
-              <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
-                {language === 'ar' ? 'إنشاء رحلة' : 'Create Ride'}
-              </Text>
-            </TouchableOpacity>
-          </>
         )}
 
-        {/* Support Section */}
-        <Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>{t.support}</Text>
-        <View className="mb-2">
+        {/* Barriers */}
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            props.navigation.navigate('tabs', { screen: 'barriers' });
+            props.navigation.closeDrawer();
+          }}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <Image source={icons.barriers} resizeMode='contain' className='w-8 h-8' tintColor={"white"}/>
+          </View>
+          <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'الحواجز' : 'Barriers'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 15 }} />
+
+        {/* Share App */}
+        <View className="mb-3">
           <TouchableOpacity
             onPress={handleShare}
             activeOpacity={0.7}
@@ -345,20 +320,25 @@ export default function SideMenu(props: DrawerContentComponentProps) {
             <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
               <MaterialIcons name="share" size={22} color="#fff" />
             </View>
-            <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.shareApp}</Text>
+            <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.shareApp}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleRate}
-            activeOpacity={0.7}
-            className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
-          >
-            <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-              <MaterialIcons name="star" size={22} color="#fff" />
-            </View>
-            <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.rateUs}</Text>
+
+        </View>
+
+        {/* Rate App */}
+        <TouchableOpacity
+          onPress={handleRate}
+          activeOpacity={0.7}
+          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+        >
+          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+            <MaterialIcons name="star" size={22} color="#fff" />
+          </View>
+          <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.rateUs}</Text>
           </TouchableOpacity>
 
+        {/* Privacy Policy */}
           <TouchableOpacity
             onPress={() => router.push('/(root)/privacy-policy')}
             activeOpacity={0.7}
@@ -367,9 +347,10 @@ export default function SideMenu(props: DrawerContentComponentProps) {
             <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
               <MaterialIcons name="privacy-tip" size={22} color="#fff" />
             </View>
-            <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.privacyPolicy}</Text>
+          <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.privacyPolicy}</Text>
           </TouchableOpacity>
 
+        {/* Help */}
           <TouchableOpacity
             onPress={() => router.push('/(root)/help')}
             activeOpacity={0.7}
@@ -378,14 +359,13 @@ export default function SideMenu(props: DrawerContentComponentProps) {
             <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
               <MaterialIcons name="help-outline" size={22} color="#fff" />
             </View>
-            <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.helpAndSupport}</Text>
+          <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.helpAndSupport}</Text>
           </TouchableOpacity>
-        </View>
 
         {/* Divider */}
-        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
+        <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 15 }} />
 
-        {/* Logout Button */}
+        {/* Logout */}
         <TouchableOpacity
           onPress={handleSignOut}
           activeOpacity={0.7}
@@ -395,7 +375,7 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           <View className={`w-9 h-9 rounded-full bg-red-100 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
             <MaterialIcons name="logout" size={22} color="#ef4444" />
           </View>
-          <Text className={`text-base font-CairoBold mt-2 text-red-600 ${isRTL ? 'text-right' : 'text-left'}`}>{t.logout}</Text>
+          <Text className={`text-base font-CairoBold text-red-600 ${isRTL ? 'text-right' : 'text-left'}`}>{t.logout}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

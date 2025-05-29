@@ -510,6 +510,47 @@ const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProp
     const formattedTime = time.includes(':') ? formatTimeTo12Hour(time) : time;
     const dayOfWeek = getDayOfWeek(item.ride_datetime, language);
 
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'available':
+          return { bg: 'bg-green-50', text: 'text-green-600' };
+        case 'in-progress':
+          return { bg: 'bg-blue-50', text: 'text-blue-600' };
+        case 'completed':
+          return { bg: 'bg-purple-50', text: 'text-purple-600' };
+        case 'cancelled':
+          return { bg: 'bg-red-50', text: 'text-red-600' };
+        case 'full':
+          return { bg: 'bg-red-50', text: 'text-red-600' };
+        case 'on-hold':
+          return { bg: 'bg-orange-50', text: 'text-orange-600' };
+        default:
+          return { bg: 'bg-gray-50', text: 'text-gray-600' };
+      }
+    };
+
+    const getStatusText = (status: string) => {
+      switch (status) {
+        case 'available':
+          return language === 'ar' ? 'متاح' : 'Available';
+        case 'in-progress':
+          return language === 'ar' ? 'قيد التنفيذ' : 'In Progress';
+        case 'completed':
+          return language === 'ar' ? 'مكتمل' : 'Completed';
+        case 'cancelled':
+          return language === 'ar' ? 'ملغي' : 'Cancelled';
+        case 'full':
+          return language === 'ar' ? 'ممتلئ' : 'Full';
+        case 'on-hold':
+          return language === 'ar' ? 'معلق' : 'On Hold';
+        default:
+          return language === 'ar' ? 'غير معروف' : 'Unknown';
+      }
+    };
+
+    const statusColors = getStatusColor(item.status);
+    const statusText = getStatusText(item.status);
+
     return (
       <TouchableOpacity
         onPress={() => router.push(`/ride-details/${item.id}`)}
@@ -517,9 +558,9 @@ const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProp
         style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
       >
         <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'}`}>
-          <View className={`px-2 py-1 rounded-full ${item.is_recurring ? 'bg-orange-50' : 'bg-green-50'}`}>
-            <Text className={`text-xs font-CairoMedium ${item.is_recurring ? 'text-orange-400' : 'text-green-600'}`}>
-              {item.is_recurring ? (language === 'ar' ? 'متكرر' : 'Recurring') : (language === 'ar' ? 'متاح' : 'Available')}
+          <View className={`px-2 py-1 rounded-full ${statusColors.bg}`}>
+            <Text className={`text-xs font-CairoMedium ${statusColors.text}`}>
+              {item.is_recurring ? (language === 'ar' ? 'متكرر' : 'Recurring') : statusText}
             </Text>
           </View>
         </View>

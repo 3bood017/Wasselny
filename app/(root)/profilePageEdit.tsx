@@ -72,6 +72,20 @@ const ProfileEdit = () => {
 
   const phoneNumber = user?.unsafeMetadata?.phoneNumber as string || "+972342423423";
 
+  // Add new state for edit modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+
+  const [showCarTypeModal, setShowCarTypeModal] = useState(false);
+  const [showCarSeatsModal, setShowCarSeatsModal] = useState(false);
+  const [newCarType, setNewCarType] = useState('');
+  const [newCarSeats, setNewCarSeats] = useState('');
+  const [isUpdatingCar, setIsUpdatingCar] = useState(false);
+
   const fetchUserData = async (isMounted = true) => {
     if (!user?.id) {
       if (isMounted) {
@@ -227,13 +241,31 @@ const ProfileEdit = () => {
     }
   };
 
-  const handleEditField = async (field: string) => {
+  // Update handleEditField to use modal
+  const handleEditField = (field: string) => {
+    setEditingField(field);
+    setEditValue(editValues[field as keyof typeof editValues] || '');
+    setEditModalVisible(true);
+  };
+
+  // Update handleSaveEdit function
+  const handleSaveEdit = async () => {
     if (!user?.id) return;
 
     try {
       const userRef = doc(db, 'users', user.id);
+      const field = editingField;
+
       if (field === 'carType') {
-        await updateDoc(userRef, { 'driver.car_type': editValues.carType });
+        if (!editValue.trim()) {
+          Alert.alert(
+            language === 'ar' ? 'خطأ' : 'Error',
+            language === 'ar' ? 'يرجى إدخال نوع السيارة' : 'Please enter car type'
+          );
+          return;
+        }
+        await updateDoc(userRef, { 'driver.car_type': editValue.trim() });
+        setEditValues(prev => ({ ...prev, carType: editValue.trim() }));
         setUserData(prev => {
           if (!prev.data?.driver) return prev;
           return {
@@ -242,21 +274,22 @@ const ProfileEdit = () => {
               ...prev.data,
               driver: {
                 ...prev.data.driver,
-                car_type: editValues.carType,
+                car_type: editValue.trim(),
               }
             }
           };
         });
       } else if (field === 'carSeats') {
-        const seats = parseInt(editValues.carSeats, 10);
-        if (isNaN(seats) || seats < 1) {
+        const seats = parseInt(editValue, 10);
+        if (isNaN(seats) || seats < 1 || seats > 10) {
           Alert.alert(
             language === 'ar' ? 'خطأ' : 'Error',
-            language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح' : 'Please enter a valid number of seats'
+            language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح (1-10)' : 'Please enter a valid number of seats (1-10)'
           );
           return;
         }
         await updateDoc(userRef, { 'driver.car_seats': seats });
+        setEditValues(prev => ({ ...prev, carSeats: seats.toString() }));
         setUserData(prev => {
           if (!prev.data?.driver) return prev;
           return {
@@ -271,21 +304,71 @@ const ProfileEdit = () => {
           };
         });
       } else if (field === 'phoneNumber') {
-        await user?.update({ unsafeMetadata: { phoneNumber: editValues.phoneNumber } });
+        // Basic phone number validation
+        const phoneRegex = /^\+?[0-9]{10,15}$/;
+        if (!phoneRegex.test(editValue.trim())) {
+          Alert.alert(
+            language === 'ar' ? 'خطأ' : 'Error',
+            language === 'ar' ? 'يرجى إدخال رقم هاتف صالح' : 'Please enter a valid phone number'
+          );
+          return;
+        }
+
+        try {
+          // Update in Firestore first
+          await updateDoc(userRef, { phone: editValue.trim() });
+          
+          // Then update in Clerk
+          await user?.update({
+            unsafeMetadata: {
+              ...user.unsafeMetadata,
+              phoneNumber: editValue.trim()
+            }
+          });
+
+          // Update local state
+          setEditValues(prev => ({ ...prev, phoneNumber: editValue.trim() }));
+          
+          // Show success message
+          Alert.alert(
+            language === 'ar' ? 'نجاح' : 'Success',
+            language === 'ar' ? 'تم تحديث رقم الهاتف بنجاح' : 'Phone number updated successfully'
+          );
+          
+          // Trigger haptic feedback
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Close modal and reset state
+          setEditModalVisible(false);
+          setEditingField(null);
+          
+          return; // Exit early since we've handled the success case
+        } catch (error) {
+          console.error('Error updating phone number:', error);
+          throw new Error('Failed to update phone number');
+        }
       }
 
+      // Show success message for other fields
       Alert.alert(
         language === 'ar' ? 'نجاح' : 'Success',
         language === 'ar' ? 'تم تحديث المعلومات بنجاح' : 'Information updated successfully'
       );
+      
+      // Trigger haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Close modal and reset state
+      setEditModalVisible(false);
+      setEditingField(null);
     } catch (error) {
-      console.error(`Error updating ${field}:`, error);
+      console.error(`Error updating ${editingField}:`, error);
       Alert.alert(
         language === 'ar' ? 'خطأ' : 'Error',
         language === 'ar' ? 'حدث خطأ أثناء تحديث المعلومات' : 'Error updating information'
       );
-    } finally {
-      setEditingField(null);
+      // Trigger error haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -324,7 +407,7 @@ const ProfileEdit = () => {
 
       // Show temporary local image while uploading
       setUserData(prev => ({ ...prev, profileImage: asset.uri }));
-      setIsUploading(true);
+        setIsUploading(true);
 
       // Upload to Cloudinary first
       const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
@@ -433,7 +516,7 @@ const ProfileEdit = () => {
         return;
       }
 
-      setIsUploading(true);
+        setIsUploading(true);
 
       // Upload to Cloudinary
       const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
@@ -552,6 +635,186 @@ const ProfileEdit = () => {
     }
   };
 
+  // Update handlePhoneNumberUpdate function
+  const handlePhoneNumberUpdate = async () => {
+    if (!user?.id) return;
+
+    // Format phone number with +972 prefix
+    const formattedNumber = '+972' + newPhoneNumber.trim();
+
+    // Validate phone number format
+    const phoneRegex = /^\+972[0-9]{9}$/;
+    if (!phoneRegex.test(formattedNumber)) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' 
+          ? 'يرجى إدخال رقم هاتف صالح (9 أرقام بعد +972)' 
+          : 'Please enter a valid phone number (9 digits after +972)'
+      );
+      return;
+    }
+
+    try {
+      setIsUpdatingPhone(true);
+      const userRef = doc(db, 'users', user.id);
+
+      // Update in Firestore first using 'phone' instead of 'phoneNumber'
+      await updateDoc(userRef, { phone: formattedNumber });
+      
+      // Then update in Clerk
+      await user?.update({
+        unsafeMetadata: {
+          ...user.unsafeMetadata,
+          phoneNumber: formattedNumber
+        }
+      });
+
+      // Update local state
+      setEditValues(prev => ({ ...prev, phoneNumber: formattedNumber }));
+      
+      // Show success message
+      Alert.alert(
+        language === 'ar' ? 'نجاح' : 'Success',
+        language === 'ar' ? 'تم تحديث رقم الهاتف بنجاح' : 'Phone number updated successfully'
+      );
+      
+      // Trigger haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Close modal and reset state
+      setShowPhoneModal(false);
+      setNewPhoneNumber('');
+    } catch (error) {
+      console.error('Error updating phone number:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحديث رقم الهاتف' : 'Error updating phone number'
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsUpdatingPhone(false);
+    }
+  };
+
+  // Add new function to handle car type update
+  const handleCarTypeUpdate = async () => {
+    if (!user?.id) return;
+
+    if (!newCarType.trim()) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'يرجى إدخال نوع السيارة' : 'Please enter car type'
+      );
+      return;
+    }
+
+    try {
+      setIsUpdatingCar(true);
+      const userRef = doc(db, 'users', user.id);
+
+      // Update in Firestore
+      await updateDoc(userRef, { 'driver.car_type': newCarType.trim() });
+      
+      // Update local state
+      setEditValues(prev => ({ ...prev, carType: newCarType.trim() }));
+      setUserData(prev => {
+        if (!prev.data?.driver) return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            driver: {
+              ...prev.data.driver,
+              car_type: newCarType.trim(),
+            }
+          }
+        };
+      });
+      
+      // Show success message
+      Alert.alert(
+        language === 'ar' ? 'نجاح' : 'Success',
+        language === 'ar' ? 'تم تحديث نوع السيارة بنجاح' : 'Car type updated successfully'
+      );
+      
+      // Trigger haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Close modal and reset state
+      setShowCarTypeModal(false);
+      setNewCarType('');
+    } catch (error) {
+      console.error('Error updating car type:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحديث نوع السيارة' : 'Error updating car type'
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsUpdatingCar(false);
+    }
+  };
+
+  // Add new function to handle car seats update
+  const handleCarSeatsUpdate = async () => {
+    if (!user?.id) return;
+
+    const seats = parseInt(newCarSeats, 10);
+    if (isNaN(seats) || seats < 1 || seats > 10) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح (1-10)' : 'Please enter a valid number of seats (1-10)'
+      );
+      return;
+    }
+
+    try {
+      setIsUpdatingCar(true);
+      const userRef = doc(db, 'users', user.id);
+
+      // Update in Firestore
+      await updateDoc(userRef, { 'driver.car_seats': seats });
+      
+      // Update local state
+      setEditValues(prev => ({ ...prev, carSeats: seats.toString() }));
+      setUserData(prev => {
+        if (!prev.data?.driver) return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            driver: {
+              ...prev.data.driver,
+              car_seats: seats,
+            }
+          }
+        };
+      });
+      
+      // Show success message
+      Alert.alert(
+        language === 'ar' ? 'نجاح' : 'Success',
+        language === 'ar' ? 'تم تحديث عدد المقاعد بنجاح' : 'Car seats updated successfully'
+      );
+      
+      // Trigger haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Close modal and reset state
+      setShowCarSeatsModal(false);
+      setNewCarSeats('');
+    } catch (error) {
+      console.error('Error updating car seats:', error);
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'حدث خطأ أثناء تحديث عدد المقاعد' : 'Error updating car seats'
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsUpdatingCar(false);
+    }
+  };
+
   return (
     <>
       <Stack.Screen 
@@ -602,7 +865,7 @@ const ProfileEdit = () => {
               </TouchableOpacity>
             </View>
 
-            {userData.isDriver && (
+            {userData.isDriver ? (
               <View className="w-[48%]">
                 <TouchableOpacity 
                   onPress={() => setShowFullCarImage(true)} 
@@ -620,6 +883,13 @@ const ProfileEdit = () => {
                     <MaterialCommunityIcons name="camera" size={20} color="white" />
                   </TouchableOpacity>
                 </TouchableOpacity>
+              </View>
+            ) : (
+              <View className="w-[48%] bg-gray-50 rounded-2xl p-4 items-center justify-center">
+                <MaterialCommunityIcons name="car" size={40} color="#9CA3AF" />
+                <Text className={`text-sm text-gray-500 mt-2 text-center ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                  {language === 'ar' ? 'متاح فقط للسائقين' : 'Available for drivers only'}
+                </Text>
               </View>
             )}
           </View>
@@ -650,38 +920,56 @@ const ProfileEdit = () => {
               </View>
             </View>
 
-            {/* Car Type - Only for drivers */}
-            {userData.isDriver && (
-              <View>
-                <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
-                </Text>
-                <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                  <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                    {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+            {/* Driver Information Section */}
+            {userData.isDriver ? (
+              <>
+                {/* Car Type */}
+                <View>
+                  <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
                   </Text>
-                  <TouchableOpacity onPress={() => setEditingField('carType')}>
-                    <MaterialIcons name="edit" size={20} color="#F97316" />
-                  </TouchableOpacity>
+                  <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+                    </Text>
+                    <TouchableOpacity onPress={() => setShowCarTypeModal(true)}>
+                      <MaterialIcons name="edit" size={20} color="#F97316" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            )}
 
-            {/* Car Seats - Only for drivers */}
-            {userData.isDriver && (
-              <View>
-                <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  {language === 'ar' ? 'عدد المقاعد' : 'Car Seats'}
-                </Text>
-                <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                  <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                    {userData.data?.driver?.car_seats || '0'}
+                {/* Car Seats */}
+                <View>
+                  <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {language === 'ar' ? 'عدد المقاعد' : 'Car Seats'}
                   </Text>
-                  <TouchableOpacity onPress={() => setEditingField('carSeats')}>
-                    <MaterialIcons name="edit" size={20} color="#F97316" />
-                  </TouchableOpacity>
+                  <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {userData.data?.driver?.car_seats || '0'}
+                    </Text>
+                    <TouchableOpacity onPress={() => setShowCarSeatsModal(true)}>
+                      <MaterialIcons name="edit" size={20} color="#F97316" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={() => router.push('/(root)/driverInfo')}
+                className="bg-orange-50 rounded-xl p-4"
+              >
+                <View className={`flex-row items-center justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                  <View className={`flex-1 ${language === 'ar' ? 'items-end' : 'items-start'}`}>
+                    <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-orange-500`}>
+                      {language === 'ar' ? 'كن سائقاً' : 'Become a Driver'}
+                    </Text>
+                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' ? 'اكسب المال من خلال تقديم الرحلات' : 'Earn money by giving rides'}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="arrow-forward-ios" size={20} color="#F97316" />
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* Phone Number */}
@@ -693,7 +981,7 @@ const ProfileEdit = () => {
                 <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {phoneNumber}
                 </Text>
-                <TouchableOpacity onPress={() => setEditingField('phoneNumber')}>
+                <TouchableOpacity onPress={() => setShowPhoneModal(true)}>
                   <MaterialIcons name="edit" size={20} color="#F97316" />
                 </TouchableOpacity>
               </View>
@@ -713,6 +1001,332 @@ const ProfileEdit = () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* Edit Modal */}
+        <Modal
+          visible={editModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditModalVisible(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <View className="bg-white rounded-2xl w-full max-w-sm p-6">
+              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {editingField === 'carType' 
+                  ? (language === 'ar' ? 'تعديل نوع السيارة' : 'Edit Car Type')
+                  : editingField === 'carSeats'
+                  ? (language === 'ar' ? 'تعديل عدد المقاعد' : 'Edit Car Seats')
+                  : (language === 'ar' ? 'تعديل رقم الهاتف' : 'Edit Phone Number')}
+              </Text>
+              <TextInput
+                value={editValue}
+                onChangeText={setEditValue}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={
+                  editingField === 'carType'
+                    ? (language === 'ar' ? 'أدخل نوع السيارة' : 'Enter car type')
+                    : editingField === 'carSeats'
+                    ? (language === 'ar' ? 'أدخل عدد المقاعد (1-10)' : 'Enter number of seats (1-10)')
+                    : (language === 'ar' ? 'أدخل رقم الهاتف' : 'Enter phone number')
+                }
+                keyboardType={editingField === 'carSeats' ? 'number-pad' : 'phone-pad'}
+                maxLength={editingField === 'carSeats' ? 2 : 15}
+                autoFocus
+              />
+              <View className="flex-row justify-end space-x-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    setEditModalVisible(false);
+                    setEditingField(null);
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-gray-600">
+                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveEdit}
+                  className="bg-orange-500 px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-white">
+                    {language === 'ar' ? 'حفظ' : 'Save'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Change Password Modal */}
+        <Modal
+          visible={showChangePassword}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowChangePassword(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <View className="bg-white rounded-2xl w-full max-w-sm p-6">
+              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}
+              </Text>
+              <TextInput
+                value={passwordData.currentPassword}
+                onChangeText={(text) => setPasswordData(prev => ({ ...prev, currentPassword: text }))}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={language === 'ar' ? 'كلمة المرور الحالية' : 'Current Password'}
+                secureTextEntry
+              />
+              <TextInput
+                value={passwordData.newPassword}
+                onChangeText={(text) => setPasswordData(prev => ({ ...prev, newPassword: text }))}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={language === 'ar' ? 'كلمة المرور الجديدة' : 'New Password'}
+                secureTextEntry
+              />
+              <TextInput
+                value={passwordData.confirmPassword}
+                onChangeText={(text) => setPasswordData(prev => ({ ...prev, confirmPassword: text }))}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={language === 'ar' ? 'تأكيد كلمة المرور الجديدة' : 'Confirm New Password'}
+                secureTextEntry
+              />
+              <View className="flex-row justify-end space-x-2">
+                <TouchableOpacity
+                  onPress={() => setShowChangePassword(false)}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-gray-600">
+                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleChangePassword}
+                  disabled={isChangingPassword}
+                  className="bg-orange-500 px-4 py-2 rounded-lg"
+                >
+                  {isChangingPassword ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white">
+                      {language === 'ar' ? 'حفظ' : 'Save'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Phone Number Modal */}
+        <Modal
+          visible={showPhoneModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPhoneModal(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <View className="bg-white rounded-2xl w-full max-w-sm p-6">
+              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تحديث رقم الهاتف' : 'Update Phone Number'}
+              </Text>
+              
+              <View className="mb-4">
+                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'الرقم الحالي' : 'Current Number'}
+                </Text>
+                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {phoneNumber}
+                </Text>
+              </View>
+
+              <View className="mb-4">
+                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'رقم الهاتف الجديد' : 'New Phone Number'}
+                </Text>
+                <View className={`flex-row items-center bg-gray-50 rounded-xl overflow-hidden ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                  <View className="bg-gray-200 px-4 py-4">
+                    <Text className="text-gray-700 font-medium">+972</Text>
+                  </View>
+                  <TextInput
+                    value={newPhoneNumber}
+                    onChangeText={(text) => {
+                      // Only allow digits
+                      const cleaned = text.replace(/[^\d]/g, '');
+                      // Limit to 9 digits
+                      setNewPhoneNumber(cleaned.slice(0, 9));
+                    }}
+                    className={`flex-1 p-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                    placeholder={language === 'ar' ? 'أدخل الرقم' : 'Enter number'}
+                    keyboardType="number-pad"
+                    maxLength={9}
+                    autoFocus
+                  />
+                </View>
+                <Text className={`text-xs text-gray-500 mt-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' 
+                    ? 'أدخل 9 أرقام بعد +972' 
+                    : 'Enter 9 digits after +972'}
+                </Text>
+              </View>
+
+              <View className="flex-row justify-end space-x-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPhoneModal(false);
+                    setNewPhoneNumber('');
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-gray-600">
+                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handlePhoneNumberUpdate}
+                  disabled={isUpdatingPhone || newPhoneNumber.length !== 9}
+                  className={`px-4 py-2 rounded-lg ${newPhoneNumber.length === 9 ? 'bg-orange-500' : 'bg-gray-300'}`}
+                >
+                  {isUpdatingPhone ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white">
+                      {language === 'ar' ? 'حفظ' : 'Save'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Car Type Modal */}
+        <Modal
+          visible={showCarTypeModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowCarTypeModal(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <View className="bg-white rounded-2xl w-full max-w-sm p-6">
+              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تحديث نوع السيارة' : 'Update Car Type'}
+              </Text>
+              
+              <View className="mb-4">
+                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'النوع الحالي' : 'Current Type'}
+                </Text>
+                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
+                </Text>
+              </View>
+
+              <TextInput
+                value={newCarType}
+                onChangeText={setNewCarType}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={language === 'ar' ? 'أدخل نوع السيارة الجديد' : 'Enter new car type'}
+                autoFocus
+              />
+
+              <View className="flex-row justify-end space-x-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowCarTypeModal(false);
+                    setNewCarType('');
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-gray-600">
+                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleCarTypeUpdate}
+                  disabled={isUpdatingCar}
+                  className="bg-orange-500 px-4 py-2 rounded-lg"
+                >
+                  {isUpdatingCar ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white">
+                      {language === 'ar' ? 'حفظ' : 'Save'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Car Seats Modal */}
+        <Modal
+          visible={showCarSeatsModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowCarSeatsModal(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <View className="bg-white rounded-2xl w-full max-w-sm p-6">
+              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تحديث عدد المقاعد' : 'Update Car Seats'}
+              </Text>
+              
+              <View className="mb-4">
+                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'العدد الحالي' : 'Current Seats'}
+                </Text>
+                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {userData.data?.driver?.car_seats || '0'}
+                </Text>
+              </View>
+
+              <TextInput
+                value={newCarSeats}
+                onChangeText={setNewCarSeats}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                placeholder={language === 'ar' ? 'أدخل عدد المقاعد الجديد' : 'Enter new number of seats'}
+                keyboardType="number-pad"
+                maxLength={2}
+                autoFocus
+              />
+
+              <Text className={`text-xs text-gray-500 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' 
+                  ? 'يجب أن يكون العدد بين 1 و 10' 
+                  : 'Number must be between 1 and 10'}
+              </Text>
+
+              <View className="flex-row justify-end space-x-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowCarSeatsModal(false);
+                    setNewCarSeats('');
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                >
+                  <Text className="text-gray-600">
+                    {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleCarSeatsUpdate}
+                  disabled={isUpdatingCar}
+                  className="bg-orange-500 px-4 py-2 rounded-lg"
+                >
+                  {isUpdatingCar ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white">
+                      {language === 'ar' ? 'حفظ' : 'Save'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </>
   );

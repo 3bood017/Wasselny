@@ -69,6 +69,80 @@ interface CachedData {
   timestamp: number;
 }
 
+const SkeletonRideCard = () => (
+  <View className="mb-4 mx-4">
+    <View className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <View className="absolute top-4 right-4 w-20 h-6 bg-gray-200 rounded-full" />
+      
+      <View className="p-4">
+        {/* Origin */}
+        <View className="flex-row items-center mb-4">
+          <View className="w-8 h-8 bg-gray-200 rounded-full mr-3" />
+          <View className="flex-1">
+            <View className="h-5 w-48 bg-gray-200 rounded mb-1" />
+            <View className="h-4 w-32 bg-gray-200 rounded" />
+          </View>
+        </View>
+
+        {/* Destination */}
+        <View className="flex-row items-center mb-4">
+          <View className="w-8 h-8 bg-gray-200 rounded-full mr-3" />
+          <View className="flex-1">
+            <View className="h-5 w-48 bg-gray-200 rounded mb-1" />
+            <View className="h-4 w-32 bg-gray-200 rounded" />
+          </View>
+        </View>
+
+        {/* Date and Time */}
+        <View className="flex-row justify-between ml-2 items-center mb-3">
+          <View className="flex-row items-center">
+            <View className="w-8 h-8 bg-gray-200 rounded-full mr-3" />
+            <View>
+              <View className="h-4 w-24 bg-gray-200 rounded mb-1" />
+              <View className="h-3 w-20 bg-gray-200 rounded" />
+            </View>
+          </View>
+          <View className="flex-row items-center">
+            <View className="h-4 w-16 bg-gray-200 rounded mr-3" />
+            <View className="w-8 h-8 bg-gray-200 rounded-full" />
+          </View>
+        </View>
+
+        {/* Seats */}
+        <View className="flex-row items-center ml-2 justify-between mb-3">
+          <View className="flex-row items-center">
+            <View className="w-4 h-4 bg-gray-200 rounded mr-2" />
+            <View className="h-4 w-24 bg-gray-200 rounded" />
+          </View>
+        </View>
+
+        {/* Driver Info */}
+        <View className="mt-4 flex-row items-center border-t border-gray-100 pt-4">
+          <View className="w-10 h-10 bg-gray-200 rounded-full mr-3" />
+          <View>
+            <View className="h-4 w-32 bg-gray-200 rounded mb-1" />
+            <View className="h-3 w-24 bg-gray-200 rounded" />
+          </View>
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
+const SkeletonFilterButtons = () => (
+  <View className="bg-white py-2 border-b border-gray-100">
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16 }}
+    >
+      {[1, 2, 3, 4].map((_, index) => (
+        <View key={index} className="h-10 w-24 bg-gray-200 rounded-full mr-3" />
+      ))}
+    </ScrollView>
+  </View>
+);
+
 export default function Rides() {
   const router = useRouter();
   const { userId } = useAuth();
@@ -920,6 +994,38 @@ export default function Rides() {
     };
     fetchUserProfile();
   }, [userId]);
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <Header profileImageUrl={profileImageUrl} title={t.Rides} />
+
+        <View className="flex-row justify-around items-center px-4 py-2 border-b border-gray-200">
+          <View className="h-8 w-24 bg-gray-200 rounded" />
+          <View className="h-8 w-24 bg-gray-200 rounded" />
+        </View>
+
+        {activeTab === 'upcoming' && (
+          <>
+            <SkeletonFilterButtons />
+            <SkeletonFilterButtons />
+          </>
+        )}
+
+        <ScrollView 
+          className="flex-1"
+          contentContainerStyle={{ paddingVertical: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <SkeletonRideCard />
+          <SkeletonRideCard />
+          <SkeletonRideCard />
+          <SkeletonRideCard />
+          <SkeletonRideCard />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">

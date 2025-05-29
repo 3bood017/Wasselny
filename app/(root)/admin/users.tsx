@@ -7,6 +7,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '@/context/LanguageContext';
+import Header from '@/components/Header';
 
 interface User {
   id: string;
@@ -20,6 +21,27 @@ interface User {
   };
   createdAt: string;
 }
+
+const SkeletonUserCard = () => (
+  <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+    <View className="flex-row justify-between items-start">
+      <View className="flex-row flex-1">
+        <View className="mr-4">
+          <View className="w-12 h-12 rounded-full bg-gray-200" />
+        </View>
+        <View className="flex-1">
+          <View className="h-6 w-32 bg-gray-200 rounded mb-2" />
+          <View className="h-4 w-48 bg-gray-200 rounded mb-2" />
+          <View className="flex-row mt-2">
+            <View className="h-6 w-20 bg-gray-200 rounded-full mr-2" />
+            <View className="h-6 w-16 bg-gray-200 rounded-full" />
+          </View>
+        </View>
+      </View>
+      <View className="w-10 h-10 bg-gray-200 rounded-full" />
+    </View>
+  </View>
+);
 
 const UsersManagement = () => {
   const { user } = useUser();
@@ -141,55 +163,71 @@ const UsersManagement = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#F97316" />
-        <Text className="text-gray-600 mt-4">Loading users...</Text>
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <Header showProfileImage={false} showSideMenu={false} title={language === 'ar' ? 'ادارة المستخدمين' : 'Users Management'} />
+        <ScrollView className="flex-1 px-4">
+          <View className="py-4">
+            {/* Search and Filter Skeleton */}
+            <View className="mb-6">
+              <View className="h-14 bg-gray-200 rounded-xl mb-4" />
+              <View className="flex-row space-x-2">
+                <View className="flex-1 h-10 bg-gray-200 rounded-full" />
+                <View className="flex-1 h-10 bg-gray-200 rounded-full" />
+                <View className="flex-1 h-10 bg-gray-200 rounded-full" />
+              </View>
+            </View>
+
+            {/* Users List Skeleton */}
+            <View>
+              <SkeletonUserCard />
+              <SkeletonUserCard />
+              <SkeletonUserCard />
+              <SkeletonUserCard />
+              <SkeletonUserCard />
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
+      <Header showProfileImage={false} showSideMenu={false} title={language === 'ar' ? 'ادارة المستخدمين' : 'Users Management'} />
       <ScrollView className="flex-1 px-4">
-      <View className="py-4">
-          {/* Header */}
-          <View className="flex-row items-center justify-between mb-6">
-            <TouchableOpacity 
-              onPress={() => router.back()}
-              className="bg-gray-100 p-2 rounded-full"
-            >
-              <MaterialCommunityIcons name="arrow-left" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            <Text className="text-2xl font-bold">Users Management</Text>
-            <View className="w-10" />
-          </View>
-
+        <View className="py-4">
           {/* Search and Filter */}
           <View className="mb-6">
             <TextInput
-              className="bg-white rounded-xl p-4 mb-4 shadow-sm"
-              placeholder="Search users..."
+              className={`bg-white rounded-xl p-4 mb-4 shadow-sm ${language === 'ar' ? 'text-right font-CairoRegular' : 'text-left font-JakartaRegular'}`}
+              placeholder={language === 'ar' ? 'البحث عن المستخدمين...' : 'Search users...'}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <View className="flex-row space-x-2">
+            <View className={`flex-row ${language === 'ar' ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
               <TouchableOpacity 
                 onPress={() => setFilter('all')}
                 className={`flex-1 py-2 px-4 rounded-full ${filter === 'all' ? 'bg-blue-500' : 'bg-gray-200'}`}
               >
-                <Text className={`text-center ${filter === 'all' ? 'text-white' : 'text-gray-600'}`}>All</Text>
+                <Text className={`text-center ${filter === 'all' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                  {language === 'ar' ? 'الكل' : 'All'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 onPress={() => setFilter('drivers')}
                 className={`flex-1 py-2 px-4 rounded-full ${filter === 'drivers' ? 'bg-green-500' : 'bg-gray-200'}`}
               >
-                <Text className={`text-center ${filter === 'drivers' ? 'text-white' : 'text-gray-600'}`}>Drivers</Text>
+                <Text className={`text-center ${filter === 'drivers' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                  {language === 'ar' ? 'السائقين' : 'Drivers'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 onPress={() => setFilter('passengers')}
                 className={`flex-1 py-2 px-4 rounded-full ${filter === 'passengers' ? 'bg-purple-500' : 'bg-gray-200'}`}
               >
-                <Text className={`text-center ${filter === 'passengers' ? 'text-white' : 'text-gray-600'}`}>Passengers</Text>
+                <Text className={`text-center ${filter === 'passengers' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                  {language === 'ar' ? 'الركاب' : 'Passengers'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

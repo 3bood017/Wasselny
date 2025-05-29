@@ -14,6 +14,7 @@ import * as Location from 'expo-location'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import Modal from 'react-native-modal'
 import debounce from 'lodash/debounce'
+import Animated, { FadeIn } from 'react-native-reanimated'
 
 // Constants
 const MAX_DISTANCE_KM = 500
@@ -72,20 +73,22 @@ function parseCustomDate(dateStr: string) {
   return new Date(year, month - 1, day, hour, minute);
 }
 
-// Helper to fetch driver image
-async function fetchDriverImage(driverId: string): Promise<string | null> {
+// Helper to fetch driver image and name
+async function fetchDriverInfo(driverId: string): Promise<{ profile_image_url: string | null; name: string | null; car_type: string | null }> {
   try {
     const userDoc = await getDoc(doc(db, 'users', driverId));
     if (userDoc.exists()) {
       const userData = userDoc.data();
-
-      return userData.driver?.profile_image_url || null;
-
+      return {
+        profile_image_url: userData.driver?.profile_image_url || userData.profile_image_url || null,
+        name: userData.name || null,
+        car_type: userData.driver?.car_type || null
+      };
     }
   } catch (err) {
     // Ignore
   }
-  return null;
+  return { profile_image_url: null, name: null, car_type: null };
 }
 
 // Add type guard for toDate
@@ -195,20 +198,29 @@ const Search = () => {
           const ride = docSnap.data()
           if (!isValidRide(ride)) continue
           let profile_image_url: string | undefined = undefined
+          let driverName: string | undefined = undefined
+          let carType: string | undefined = undefined
           if (ride.driver_id) {
-            const imageUrl = await fetchDriverImage(ride.driver_id)
-            if (imageUrl) {
-              profile_image_url = imageUrl
+            const driverInfo = await fetchDriverInfo(ride.driver_id)
+            if (driverInfo.profile_image_url) {
+              profile_image_url = driverInfo.profile_image_url
+            }
+            if (driverInfo.name) {
+              driverName = driverInfo.name
+            }
+            if (driverInfo.car_type) {
+              carType = driverInfo.car_type
             }
           }
           rides.push({
             id: docSnap.id,
             type: 'ride',
+            name: driverName,
             origin: ride.origin_address,
             destination: ride.destination_address,
             ride_datetime: ride.ride_datetime,
             price: ride.price,
-            car_type: ride.car_type,
+            car_type: carType,
             rating: ride.driver_rating,
             is_recurring: ride.is_recurring,
             recurring_days: ride.ride_days,
@@ -427,8 +439,8 @@ const Search = () => {
       style={{ justifyContent: 'flex-end', margin: 0 }}
     >
       <View className="bg-white rounded-t-3xl p-6 max-h-[92%]">
-        <View className="flex-row justify-between items-center mb-6">
-          <Text className={`text-xl font-CairoBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+        <View className={`flex-row justify-between items-center mb-6 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <Text className={`text-xl ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
             {language === 'ar' ? 'تصفية النتائج' : 'Filter Results'}
           </Text>
           <TouchableOpacity onPress={() => setShowFilters(false)}>
@@ -438,10 +450,10 @@ const Search = () => {
 
         {/* Distance Filter */}
         <View className="mb-4">
-          <Text className={`text-base font-CairoBold mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+          <Text className={`text-base ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
             {language === 'ar' ? 'المسافة (كم)' : 'Distance (km)'}
           </Text>
-          <View className="flex-row items-center justify-between bg-gray-50 p-2 rounded-xl">
+          <View className={`flex-row items-center justify-between bg-gray-50 p-2 rounded-xl ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             <TouchableOpacity
               onPress={() => setFilters(prev => ({ ...prev, distance: Math.max((prev.distance || 0) - 1, MIN_DISTANCE_KM) }))}
               className="bg-primary/10 p-3 rounded-full"
@@ -450,7 +462,7 @@ const Search = () => {
             </TouchableOpacity>
             <TextInput
               style={{ width: 60, textAlign: 'center' }}
-              className="text-lg font-CairoBold text-gray-800 bg-transparent mx-2"
+              className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 bg-transparent mx-2`}
               keyboardType="numeric"
               value={filters.distance?.toString() || ''}
               onChangeText={val => {
@@ -463,6 +475,7 @@ const Search = () => {
               placeholder={language === 'ar' ? 'المسافة' : 'Distance'}
               maxLength={3}
               returnKeyType="done"
+              textAlign="center"
             />
             <TouchableOpacity
               onPress={() => setFilters(prev => ({ ...prev, distance: Math.min((prev.distance || 0) + 1, MAX_DISTANCE_KM) }))}
@@ -643,7 +656,7 @@ const Search = () => {
         </View>
 
         {/* Apply Filters Button */}
-        <View className="flex-row space-x-3 mt-4">
+        <View className={`flex-row space-x-3 mt-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
           <TouchableOpacity
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -661,7 +674,7 @@ const Search = () => {
             }}
             className="flex-1 bg-red-50 py-4 rounded-xl border border-red-200"
           >
-            <Text className="text-red-500 text-center font-CairoBold text-lg">
+            <Text className={`text-red-500 text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-lg`}>
               {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
             </Text>
           </TouchableOpacity>
@@ -673,7 +686,7 @@ const Search = () => {
             }}
             className="flex-1 bg-orange-500 py-4 rounded-xl"
           >
-            <Text className="text-white text-center font-CairoBold text-lg">
+            <Text className={`text-white text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-lg`}>
               {language === 'ar' ? 'تطبيق' : 'Apply'}
             </Text>
           </TouchableOpacity>
@@ -701,10 +714,12 @@ const Search = () => {
       const timeDisplay = dateObj.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })
       const statusColor = item.status === 'available' ? 'bg-green-50 text-green-600' : 
                          item.status === 'pending' ? 'bg-yellow-50 text-yellow-600' : 
-                         item.status === 'ended' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'
+                         item.status === 'ended' ? 'bg-red-50 text-red-600' : 
                          item.status === 'cancelled' ? 'bg-red-50 text-red-600' :
                          item.status === 'in-progress' ? 'bg-blue-50 text-blue-600' :
-                         item.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-700'
+                         item.status === 'completed' ? 'bg-green-50 text-green-600' :
+                         item.status === 'full' ? 'bg-red-50 text-red-600' :
+                         'bg-gray-100 text-gray-700'
 
       return (
         <TouchableOpacity
@@ -712,97 +727,149 @@ const Search = () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
             router.push({ pathname: "/(root)/ride-details/[id]", params: { id: item.id } })
           }}
-          className="bg-white p-4 rounded-2xl mb-3 mx-2"
+          className="bg-white p-5 rounded-2xl mb-4 mx-2"
           style={Platform.OS === 'android' ? { elevation: 5 } : styles.iosShadow}
         >
-          <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'}`}>
-            <View className={`px-2 py-1 rounded-full ${statusColor}`}>
-              <Text className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+          {/* Status Badge */}
+          <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'} z-10`}>
+            <View className={`px-3 py-1.5 rounded-full ${statusColor}`}>
+              <Text className={`text-xs ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
                 {item.status === 'ended' ? (language === 'ar' ? 'منتهي' : 'Ended') :
                  item.status === 'cancelled' ? (language === 'ar' ? 'ملغي' : 'Cancelled') :
                  item.status === 'in-progress' ? (language === 'ar' ? 'قيد الانتظار' : 'Pending') :
                  item.status === 'completed' ? (language === 'ar' ? 'منتهي' : 'Ended') :
                  item.status === 'available' ? (language === 'ar' ? 'متاح' : 'Available') :
                  item.status === 'pending' ? (language === 'ar' ? 'قيد الانتظار' : 'Pending') :
+                 item.status === 'full' ? (language === 'ar' ? 'ممتلئ' : 'Full') :
                  (language === 'ar' ? 'متاح' : 'Available')  }
               </Text>
             </View>
           </View>
 
-          <View className={`flex-row items-center mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-            <Image
-              source={item.profile_image_url ? { uri: item.profile_image_url } : icons.profile}
-              className={`w-10 h-10 rounded-full ${language === 'ar' ? 'ml-3' : 'mr-3'}`}
-            />
+          {/* Driver Info */}
+          <View className={`flex-row items-center mb-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className="relative">
+              <Image
+                source={item.profile_image_url ? { uri: item.profile_image_url } : icons.profile}
+                className={`w-12 h-12 rounded-full ${language === 'ar' ? 'ml-3' : 'mr-3'}`}
+              />
+              {item.rating && (
+                <View className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 border border-gray-100">
+                  <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <Image source={icons.star} className={`w-3 h-3 ${language === 'ar' ? 'ml-0.5' : 'mr-0.5'}`} tintColor="#F59E0B" />
+                    <Text className={`text-xs ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
+                      {item.rating.toFixed(1)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
             <View className={language === 'ar' ? 'items-end' : 'items-start'}>
-              <Text className={`text-base mt-5 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {language === 'ar' ? 'السائق' : 'Driver'}
+              <Text className={`text-base ${language === 'ar' ? 'font-CairoBold' : 'font-CairoBold'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {item.name || (language === 'ar' ? 'السائق' : 'Driver')}
               </Text>
               <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {item.car_type}
+                {item.car_type || (language === 'ar' ? 'نوع السيارة غير متوفر' : 'Car type not available')}
               </Text>
             </View>
           </View>
 
-          <View className={`flex-row items-start mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-            <View className="flex-1">
-              <View className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <Image source={icons.pin} resizeMode="contain" className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-                <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
-                  {language === 'ar' ? 'من' : 'From'}:
-                </Text>
-                <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                  {item.origin}
-                </Text>
-              </View>
-              {item.waypoints && item.waypoints.length > 0 && item.waypoints.map((waypoint, index) => (
-                <View key={index} className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <Image source={icons.map} resizeMode="contain" tintColor="#F79824" className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+          {/* Route Info */}
+          <View className="bg-gray-50 rounded-xl p-4 mb-4">
+            <View className={`flex-row items-start mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className="flex-1">
+                <View className={`flex-row items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <Image source={icons.pin} resizeMode="contain" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
                   <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
-                    {language === 'ar' ? 'محطة' : 'Point'} {index + 1}:
+                    {language === 'ar' ? 'من' : 'From'}:
                   </Text>
-                  <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                    {waypoint.address}
+                  <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
+                    {item.origin}
                   </Text>
                 </View>
-              ))}
-              <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <Image source={icons.target} resizeMode="contain" className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-                <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
-                  {language === 'ar' ? 'إلى' : 'To'}:
-                </Text>
-                <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
-                  {item.destination}
-                </Text>
+                {item.waypoints && item.waypoints.length > 0 && item.waypoints.map((waypoint, index) => (
+                  <View key={index} className={`flex-row items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <Image source={icons.map} resizeMode="contain" tintColor="#F79824" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
+                      {language === 'ar' ? 'محطة' : 'Point'} {index + 1}:
+                    </Text>
+                    <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
+                      {waypoint.address}
+                    </Text>
+                  </View>
+                ))}
+                <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <Image source={icons.target} resizeMode="contain" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                  <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
+                    {language === 'ar' ? 'إلى' : 'To'}:
+                  </Text>
+                  <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
+                    {item.destination}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
 
-          <View className={`flex-row flex-wrap gap-y-2 justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-            <View className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <Image source={icons.calendar} className={`w-4 h-4 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-              <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-600 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {dayOfWeek}
-              </Text>
+          {/* Ride Details */}
+          <View className={`flex-row flex-wrap gap-y-3 justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className="bg-primary/10 p-2 rounded-lg">
+                <Image source={icons.calendar} className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} tintColor="#F8780D" />
+              </View>
+              <View className={`${language === 'ar' ? 'mr-3' : 'ml-3'}`}>
+                <Text className={`text-sm ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {dayOfWeek}
+                </Text>
+                <Text className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {dateDisplay}
+                </Text>
+              </View>
             </View>
-            <View className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <Image source={icons.calendar} className={`w-4 h-4 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-              <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-600 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {dateDisplay}
-              </Text>
+
+            <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className="bg-primary/10 p-2 rounded-lg">
+                <Image source={icons.clock} className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} tintColor="#F8780D" />
+              </View>
+              <View className={`${language === 'ar' ? 'mr-3' : 'ml-3'}`}>
+                <Text className={`text-sm ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {timeDisplay}
+                </Text>
+                <Text className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'وقت الرحلة' : 'Ride Time'}
+                </Text>
+              </View>
             </View>
-            <View className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <Image source={icons.clock} className={`w-4 h-4 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-              <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-600 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {timeDisplay}
-              </Text>
+
+            <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className="bg-primary/10 p-2 rounded-lg">
+                <Image source={icons.person} className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} tintColor="#F8780D" />
+              </View>
+              <View className={`${language === 'ar' ? 'mr-3' : 'ml-3'}`}>
+                <Text className={`text-sm ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {item.available_seats}
+                </Text>
+                <Text className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  {language === 'ar' ? 'المقاعد المتاحة' : 'Available Seats'}
+                </Text>
+              </View>
             </View>
-            <View className={`flex-row items-center mb-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <Image source={icons.person} className={`w-4 h-4 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
-              <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-600 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                {item.available_seats} {language === 'ar' ? 'مقاعد' : 'seats'}
-              </Text>
-            </View>
+
+            {item.price && (
+              <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <View className="bg-primary/10 p-2 rounded-lg">
+                  <Image source={icons.car} className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} tintColor="#4F46E5" />
+                </View>
+                <View className={`${language === 'ar' ? 'mr-3' : 'ml-3'}`}>
+                  <Text className={`text-sm ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {item.price} {language === 'ar' ? 'ر.س' : 'SAR'}
+                  </Text>
+                  <Text className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    {language === 'ar' ? 'السعر' : 'Price'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
       )
@@ -816,7 +883,7 @@ const Search = () => {
           router.push({ pathname: "/(root)/driver-profile/[id]", params: { id: item.id } })
         }}
       >
-        <View className="flex-row items-center">
+        <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
           <View className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 border-2 border-primary/20">
             {item.profile_image_url ? (
               <Image source={{ uri: item.profile_image_url }} className="w-full h-full" />
@@ -826,24 +893,30 @@ const Search = () => {
               </View>
             )}
           </View>
-          <View className="ml-4 flex-1">
-            <Text className={`text-lg font-CairoBold text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+          <View className={`${language === 'ar' ? 'mr-4' : 'ml-4'} flex-1`}>
+            <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
               {item.name}
             </Text>
-            <View className="flex-row flex-wrap items-center mt-1">
-              <View className="bg-gray-50 px-3 py-1 rounded-full mr-2">
-                <Text className="text-gray-600 text-sm">{language === 'ar' ? 'سائق' : 'Driver'}</Text>
+            <View className={`flex-row flex-wrap items-center mt-1 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className="bg-gray-50 px-3 py-1 rounded-full">
+                <Text className={`text-gray-600 text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                  {language === 'ar' ? 'سائق' : 'Driver'}
+                </Text>
               </View>
               {item.car_type && (
-                <View className="bg-gray-50 px-3 py-1 rounded-full mr-2">
-                  <Text className="text-gray-600 text-sm">{item.car_type}</Text>
+                <View className={`bg-gray-50 px-3 py-1 rounded-full ${language === 'ar' ? 'mr-2' : 'ml-2'}`}>
+                  <Text className={`text-gray-600 text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {item.car_type}
+                  </Text>
                 </View>
               )}
               {item.rating && (
-                <View className="bg-gray-50 px-3 py-1 rounded-full">
-                  <View className="flex-row items-center">
-                    <Image source={icons.star} className="w-3 h-3 mr-1" tintColor="#F59E0B" />
-                    <Text className="text-gray-600 text-sm">{item.rating.toFixed(1)}</Text>
+                <View className={`bg-gray-50 px-3 py-1 rounded-full ${language === 'ar' ? 'mr-2' : 'ml-2'}`}>
+                  <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <Image source={icons.star} className={`w-3 h-3 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} tintColor="#F59E0B" />
+                    <Text className={`text-gray-600 text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                      {item.rating.toFixed(1)}
+                    </Text>
                   </View>
                 </View>
               )}
@@ -872,20 +945,89 @@ const Search = () => {
     debouncedApplyFilters(allResults)
   }, [allResults, filters, debouncedApplyFilters])
 
+  // Skeleton Loading Component
+  const SearchResultSkeleton = () => {
+    return (
+      <Animated.View 
+        entering={FadeIn}
+        className="bg-white p-5 rounded-2xl mb-4 mx-2"
+        style={Platform.OS === 'android' ? { elevation: 5 } : styles.iosShadow}
+      >
+        {/* Status Badge Skeleton */}
+        <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'} z-10`}>
+          <View className="w-20 h-6 bg-gray-200 rounded-full animate-pulse" />
+        </View>
+
+        {/* Driver Info Skeleton */}
+        <View className={`flex-row items-center mb-4 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className="relative">
+            <View className={`w-12 h-12 rounded-full bg-gray-200 animate-pulse ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
+            <View className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 border border-gray-100">
+              <View className="w-8 h-4 bg-gray-200 rounded-full animate-pulse" />
+            </View>
+          </View>
+          <View className={language === 'ar' ? 'items-end' : 'items-start'}>
+            <View className="w-24 h-5 bg-gray-200 rounded-full animate-pulse mb-2" />
+            <View className="w-20 h-4 bg-gray-200 rounded-full animate-pulse" />
+          </View>
+        </View>
+
+        {/* Route Info Skeleton */}
+        <View className="bg-gray-50 rounded-xl p-4 mb-4">
+          <View className={`flex-row items-start mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+            <View className="flex-1">
+              <View className={`flex-row items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <View className={`w-5 h-5 bg-gray-200 rounded-full animate-pulse ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                <View className="w-16 h-4 bg-gray-200 rounded-full animate-pulse" />
+                <View className="flex-1 h-4 bg-gray-200 rounded-full animate-pulse mx-2" />
+              </View>
+              <View className={`flex-row items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <View className={`w-5 h-5 bg-gray-200 rounded-full animate-pulse ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                <View className="w-16 h-4 bg-gray-200 rounded-full animate-pulse" />
+                <View className="flex-1 h-4 bg-gray-200 rounded-full animate-pulse mx-2" />
+              </View>
+              <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <View className={`w-5 h-5 bg-gray-200 rounded-full animate-pulse ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                <View className="w-16 h-4 bg-gray-200 rounded-full animate-pulse" />
+                <View className="flex-1 h-4 bg-gray-200 rounded-full animate-pulse mx-2" />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Ride Details Skeleton */}
+        <View className={`flex-row flex-wrap gap-y-3 justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          {[1, 2, 3, 4].map((_, index) => (
+            <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <View className="bg-gray-200 p-2 rounded-lg animate-pulse">
+                <View className={`w-5 h-5 ${language === 'ar' ? 'ml-1' : 'mr-1'}`} />
+              </View>
+              <View className={`${language === 'ar' ? 'mr-3' : 'ml-3'}`}>
+                <View className="w-16 h-4 bg-gray-200 rounded-full animate-pulse mb-1" />
+                <View className="w-12 h-3 bg-gray-200 rounded-full animate-pulse" />
+              </View>
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+    )
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Header profileImageUrl={profileImageUrl} title={t.Search} />
       <View className="px-4 py-3 bg-white border-b border-gray-100">
-        <View className="flex-row items-center">
-          <View className="flex-1 flex-row items-center bg-gray-50 rounded-full px-4 py-2 mr-2">
-            <Image source={icons.search} className="w-5 h-5" tintColor="#6B7280" />
+        <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <View className="flex-1 flex-row items-center bg-gray-50 rounded-full px-4 py-2">
+            <Image source={icons.search} className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} tintColor="#6B7280" />
             <TextInput
-              placeholder={language === 'ar' ? 'ابحث عن رحلات  ' : 'Search for rides'}
+              placeholder={language === 'ar' ? 'ابحث عن رحلات' : 'Search for rides'}
               value={searchQuery}
               onChangeText={handleSearchInput}
-              className={`flex-1 ${language === 'ar' ? 'text-right' : 'text-left'} font-CairoBold text-gray-700`}
+              className={`flex-1 ${language === 'ar' ? 'text-right' : 'text-left'} ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-700`}
               placeholderTextColor="#9CA3AF"
               autoFocus={true}
+              textAlign={language === 'ar' ? 'right' : 'left'}
             />
           </View>
           <TouchableOpacity
@@ -893,7 +1035,7 @@ const Search = () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
               setShowFilters(true)
             }}
-            className="bg-gray-50 p-2 rounded-full"
+            className={`bg-gray-50 p-2 rounded-full ${language === 'ar' ? 'ml-2' : 'mr-2'}`}
           >
             <Image source={icons.filter} className="w-6 h-6" tintColor="#6B7280" />
           </TouchableOpacity>
@@ -902,8 +1044,10 @@ const Search = () => {
 
       <View className="flex-1 px-4">
         {loading ? (
-          <View className="flex-1 justify-center items-center py-8">
-            <ActivityIndicator size="large" color="#4F46E5" />
+          <View className="flex-1 py-8">
+            {[1, 2, 3].map((_, index) => (
+              <SearchResultSkeleton key={index} />
+            ))}
           </View>
         ) : displayedResults.length > 0 ? (
           <FlatList
@@ -942,7 +1086,7 @@ const Search = () => {
             </Text>
           </View>
         )}
-    </View>
+      </View>
 
       {renderFilterModal()}
     </SafeAreaView>

@@ -12,6 +12,10 @@ import * as ImagePicker from "expo-image-picker";
 import { uploadImageToCloudinary } from "@/lib/upload";
 import { translations } from '@/constants/languages';
 import Header from "@/components/Header";
+import { useProfile } from '@/context/ProfileContext';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as Haptics from 'expo-haptics';
+import { useNotifications } from '@/context/NotificationContext';
 
 interface UserData {
   driver?: {
@@ -50,6 +54,7 @@ const Profile = () => {
   const { language } = useLanguage();
   const router = useRouter();
   const t = translations[language];
+  const { refreshProfileImage } = useProfile();
   
   // Add state for pending applications count
   const [pendingApplicationsCount, setPendingApplicationsCount] = useState(0);
@@ -271,31 +276,41 @@ const Profile = () => {
       setUserData(prev => ({ ...prev, profileImage: asset.uri }));
       setIsUploading(true);
 
-      // Upload to Cloudinary
+      // Upload to Cloudinary first
       const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
 
       if (!uploadedImageUrl) {
         throw new Error(language === 'ar' ? 'فشل في تحميل الصورة' : 'Failed to upload image');
       }
 
-      // Update Firestore document
+      // Update both Firebase and Clerk
       if (user?.id) {
+        // Update Clerk profile image
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const file = new File([blob], `profile.${fileExtension}`, { type: `image/${fileExtension}` });
+        
+        await user.setProfileImage({
+          file: file
+        });
+
+        // Update Firestore document
         const userRef = doc(db, 'users', user.id);
         const userDoc = await getDoc(userRef);
         
         if (userDoc.exists()) {
           const userData = userDoc.data() as UserData;
-          // If user is a driver, update the profile image in driver data
+          // Update both driver and user profile image URLs
+          const updateData: any = {
+            profile_image_url: uploadedImageUrl
+          };
+          
+          // If user is a driver, also update the driver profile image
           if (userData.driver?.is_active) {
-            await updateDoc(userRef, {
-              'driver.profile_image_url': uploadedImageUrl
-            });
-          } else {
-            // If user is not a driver, update the profile image in user data
-            await updateDoc(userRef, {
-              profile_image_url: uploadedImageUrl
-            });
+            updateData['driver.profile_image_url'] = uploadedImageUrl;
           }
+          
+          await updateDoc(userRef, updateData);
         } else {
           // Create a new user document with profile image
           await setDoc(userRef, {
@@ -311,10 +326,16 @@ const Profile = () => {
         // Update profile image state with the Cloudinary URL
         setUserData(prev => ({ ...prev, profileImage: uploadedImageUrl }));
         
+        // Refresh the profile image in the context
+        await refreshProfileImage();
+        
         Alert.alert(
           language === 'ar' ? 'نجاح' : 'Success',
           language === 'ar' ? 'تم تحديث صورة البروفايل بنجاح' : 'Profile picture updated successfully'
         );
+
+        // Trigger haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
       console.error('Profile image upload error:', error);

@@ -7,6 +7,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '@/context/LanguageContext';
+import Header from '@/components/Header';
 
 interface UserData {
   name: string;
@@ -34,6 +35,26 @@ interface Ride {
     email: string;
   };
 }
+
+const SkeletonRideCard = () => (
+  <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
+    <View className="flex-row justify-between items-start">
+      <View className="flex-1">
+        <View className="h-6 w-64 bg-gray-200 rounded mb-2" />
+        <View className="flex-row items-center mb-2">
+          <View className="h-4 w-4 bg-gray-200 rounded-full mr-2" />
+          <View className="h-4 w-32 bg-gray-200 rounded" />
+        </View>
+        <View className="flex-row items-center mb-2">
+          <View className="h-4 w-4 bg-gray-200 rounded-full mr-2" />
+          <View className="h-4 w-32 bg-gray-200 rounded" />
+        </View>
+        <View className="h-6 w-20 bg-gray-200 rounded-full" />
+      </View>
+      <View className="h-10 w-10 bg-gray-200 rounded-full" />
+    </View>
+  </View>
+);
 
 const RidesManagement = () => {
   const { user } = useUser();
@@ -131,28 +152,47 @@ const RidesManagement = () => {
     }
   };
 
+  const getStatusText = (status: Ride['status']) => {
+    switch (status) {
+      case 'in-progress':
+        return language === 'ar' ? 'قيد التنفيذ' : 'In Progress';
+      case 'completed':
+        return language === 'ar' ? 'مكتملة' : 'Completed';
+      case 'cancelled':
+        return language === 'ar' ? 'ملغاة' : 'Cancelled';
+      case 'full':
+        return language === 'ar' ? 'ممتلئة' : 'Full';
+      case 'on-hold':
+        return language === 'ar' ? 'معلقة' : 'On Hold';
+      default:
+        return language === 'ar' ? 'متاح' : 'Available';
+    }
+  };
+
   const RideCard = ({ ride }: { ride: Ride }) => (
     <View className="bg-white rounded-xl p-4 mb-4 shadow-sm">
-      <View className="flex-row justify-between items-start">
+      <View className={`flex-row justify-between items-start ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
         <View className="flex-1">
-          <Text className="text-lg font-bold mb-2">
-            {ride.origin_address || 'Unknown origin'} → {ride.destination_address || 'Unknown destination'}
+          <Text className={`text-lg mb-2 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+            {ride.origin_address || (language === 'ar' ? 'نقطة البداية غير معروفة' : 'Unknown origin')} → {ride.destination_address || (language === 'ar' ? 'نقطة الوصول غير معروفة' : 'Unknown destination')}
           </Text>
-          <View className="flex-row items-center mb-2">
+          <View className={`flex-row items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             <MaterialCommunityIcons name="account" size={16} color="#6B7280" />
-            <Text className="text-gray-600 ml-2">
-              Driver: {ride.driver?.name || 'Not assigned'}
+            <Text className={`text-gray-600 ${language === 'ar' ? 'font-CairoRegular mr-2' : 'font-JakartaRegular ml-2'}`}>
+              {language === 'ar' ? 'السائق: ' : 'Driver: '}{ride.driver?.name || (language === 'ar' ? 'غير محدد' : 'Not assigned')}
             </Text>
           </View>
-          <View className="flex-row items-center mb-2">
+          <View className={`flex-row items-center mb-2 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             <MaterialCommunityIcons name="car" size={16} color="#6B7280" />
-            <Text className="text-gray-600 ml-2">
-              Available Seats: {ride.available_seats}
+            <Text className={`text-gray-600 ${language === 'ar' ? 'font-CairoRegular mr-2' : 'font-JakartaRegular ml-2'}`}>
+              {language === 'ar' ? 'المقاعد المتاحة: ' : 'Available Seats: '}{ride.available_seats}
             </Text>
           </View>
-          <View className="flex-row items-center justify-between">
+          <View className={`flex-row items-center justify-between ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
             <View className={`px-2 py-1 rounded-full ${getStatusColor(ride.status)}`}>
-              <Text className="text-sm capitalize">{ride.status}</Text>
+              <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                {getStatusText(ride.status)}
+              </Text>
             </View>
           </View>
         </View>
@@ -163,7 +203,11 @@ const RidesManagement = () => {
           } as any)}
           className="bg-gray-100 p-2 rounded-full"
         >
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#6B7280" />
+          <MaterialCommunityIcons 
+            name={language === 'ar' ? 'chevron-left' : 'chevron-right'} 
+            size={24} 
+            color="#6B7280" 
+          />
         </TouchableOpacity>
       </View>
     </View>
@@ -171,68 +215,109 @@ const RidesManagement = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#F97316" />
-        <Text className="text-gray-600 mt-4">Loading rides...</Text>
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <Header 
+          showProfileImage={false} 
+          showSideMenu={false} 
+          title={language === 'ar' ? 'إدارة الرحلات' : 'Rides Management'} 
+        />
+        <ScrollView className="flex-1 px-4">
+          <View className="py-4">
+            {/* Search and Filter Skeleton */}
+            <View className="mb-6">
+              <View className="h-14 bg-gray-200 rounded-xl mb-4" />
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                className="mb-4"
+                contentContainerStyle={{ flexDirection: language === 'ar' ? 'row-reverse' : 'row' }}
+              >
+                <View className={`flex-row ${language === 'ar' ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
+                  {[1, 2, 3, 4, 5].map((_, index) => (
+                    <View key={index} className="h-10 w-24 bg-gray-200 rounded-full" />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
+            {/* Rides List Skeleton */}
+            <View>
+              <SkeletonRideCard />
+              <SkeletonRideCard />
+              <SkeletonRideCard />
+              <SkeletonRideCard />
+              <SkeletonRideCard />
+            </View>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
+      <Header 
+        showProfileImage={false} 
+        showSideMenu={false} 
+        title={language === 'ar' ? 'إدارة الرحلات' : 'Rides Management'} 
+      />
+      
       <ScrollView className="flex-1 px-4">
-      <View className="py-4">
-          {/* Header */}
-          <View className="flex-row items-center justify-between mb-6">
-            <TouchableOpacity 
-              onPress={() => router.back()}
-              className="bg-gray-100 p-2 rounded-full"
-            >
-              <MaterialCommunityIcons name="arrow-left" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            <Text className="text-2xl font-bold">Rides Management</Text>
-            <View className="w-10" />
-          </View>
-
+        <View className="py-4">
           {/* Search and Filter */}
           <View className="mb-6">
             <TextInput
-              className="bg-white rounded-xl p-4 mb-4 shadow-sm"
-              placeholder="Search rides..."
+              className={`bg-white rounded-xl p-4 mb-4 shadow-sm ${language === 'ar' ? 'text-right font-CairoRegular' : 'text-left font-JakartaRegular'}`}
+              placeholder={language === 'ar' ? 'البحث في الرحلات...' : 'Search rides...'}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-              <View className="flex-row space-x-2">
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              className="mb-4"
+              contentContainerStyle={{ flexDirection: language === 'ar' ? 'row-reverse' : 'row' }}
+            >
+              <View className={`flex-row ${language === 'ar' ? 'space-x-reverse space-x-2' : 'space-x-2'}`}>
                 <TouchableOpacity
                   onPress={() => setFilter('all')}
                   className={`py-2 px-4 rounded-full ${filter === 'all' ? 'bg-blue-500' : 'bg-gray-200'}`}
                 >
-                  <Text className={`text-center ${filter === 'all' ? 'text-white' : 'text-gray-600'}`}>All</Text>
+                  <Text className={`text-center ${filter === 'all' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {language === 'ar' ? 'الكل' : 'All'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setFilter('available')}
                   className={`py-2 px-4 rounded-full ${filter === 'available' ? 'bg-green-500' : 'bg-gray-200'}`}
                 >
-                  <Text className={`text-center ${filter === 'available' ? 'text-white' : 'text-gray-600'}`}>Available</Text>
+                  <Text className={`text-center ${filter === 'available' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {language === 'ar' ? 'متاح' : 'Available'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setFilter('full')}
                   className={`py-2 px-4 rounded-full ${filter === 'full' ? 'bg-purple-500' : 'bg-gray-200'}`}
                 >
-                  <Text className={`text-center ${filter === 'full' ? 'text-white' : 'text-gray-600'}`}>Full</Text>
+                  <Text className={`text-center ${filter === 'full' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {language === 'ar' ? 'ممتلئة' : 'Full'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setFilter('in-progress')}
                   className={`py-2 px-4 rounded-full ${filter === 'in-progress' ? 'bg-yellow-500' : 'bg-gray-200'}`}
                 >
-                  <Text className={`text-center ${filter === 'in-progress' ? 'text-white' : 'text-gray-600'}`}>In Progress</Text>
+                  <Text className={`text-center ${filter === 'in-progress' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {language === 'ar' ? 'قيد التنفيذ' : 'In Progress'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setFilter('completed')}
                   className={`py-2 px-4 rounded-full ${filter === 'completed' ? 'bg-blue-500' : 'bg-gray-200'}`}
                 >
-                  <Text className={`text-center ${filter === 'completed' ? 'text-white' : 'text-gray-600'}`}>Completed</Text>
+                  <Text className={`text-center ${filter === 'completed' ? 'text-white' : 'text-gray-600'} ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                    {language === 'ar' ? 'مكتملة' : 'Completed'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -242,7 +327,9 @@ const RidesManagement = () => {
           <View>
             {filteredRides.length === 0 ? (
               <View className="items-center justify-center py-8">
-                <Text className="text-gray-500 text-lg">No rides found</Text>
+                <Text className={`text-gray-500 text-lg ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                  {language === 'ar' ? 'لا توجد رحلات' : 'No rides found'}
+                </Text>
               </View>
             ) : (
               filteredRides.map(ride => (
