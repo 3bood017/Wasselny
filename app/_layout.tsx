@@ -18,6 +18,7 @@ import { useColorScheme } from 'react-native';
 import { useLanguage } from '@/context/LanguageContext';
 import SideMenu from '@/components/SideMenu';
 import { MenuProvider } from '@/context/MenuContext';
+import { ProfileProvider } from '@/context/ProfileContext';
 import * as React from 'react';
 
 const BACKGROUND_NOTIFICATION_TASK = 'ride-notification-service';
@@ -111,19 +112,23 @@ export default function RootLayout() {
   }
 
   return (
-    <LanguageProvider>
-      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-        <ClerkLoaded>
-        <MenuProvider>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="(root)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-        </MenuProvider>
-        </ClerkLoaded>
-      </ClerkProvider>
-    </LanguageProvider>
+    <ClerkProvider tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <LanguageProvider>
+          <AuthProvider>
+            <MenuProvider>
+              <ProfileProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(root)" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+              </ProfileProvider>
+            </MenuProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }

@@ -9,9 +9,10 @@ import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/upload";
 import * as ImagePicker from "expo-image-picker";
-import uploadIcon from '@/assets/icons/upload.png';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
+import { useProfile } from '@/context/ProfileContext';
 
 interface UserData {
   driver?: {
@@ -32,6 +33,7 @@ const ProfileEdit = () => {
   const { language } = useLanguage();
   const router = useRouter();
   const storage = getStorage();
+  const { refreshProfileImage } = useProfile();
 
   const [userData, setUserData] = useState<{
     isDriver: boolean;
@@ -59,6 +61,14 @@ const ProfileEdit = () => {
   });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const phoneNumber = user?.unsafeMetadata?.phoneNumber as string || "+972342423423";
 
@@ -281,34 +291,110 @@ const ProfileEdit = () => {
 
   const handleImagePick = async () => {
     try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
+          language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.'
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.8,
       });
 
-      if (!result.canceled) {
-        setIsUploading(true);
-        const response = await fetch(result.assets[0].uri);
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      if (!asset?.uri) return;
+
+      // Validate file type
+      const fileExtension = asset.uri.split('.').pop()?.toLowerCase();
+      if (!['jpg', 'jpeg', 'png'].includes(fileExtension || '')) {
+        Alert.alert(
+          language === 'ar' ? 'خطأ' : 'Error',
+          language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.'
+        );
+        return;
+      }
+
+      // Show temporary local image while uploading
+      setUserData(prev => ({ ...prev, profileImage: asset.uri }));
+      setIsUploading(true);
+
+      // Upload to Cloudinary first
+      const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
+
+      if (!uploadedImageUrl) {
+        throw new Error(language === 'ar' ? 'فشل في تحميل الصورة' : 'Failed to upload image');
+      }
+
+      // Update both Firebase and Clerk
+      if (user?.id) {
+        // Update Clerk profile image
+        const response = await fetch(asset.uri);
         const blob = await response.blob();
-        const filename = result.assets[0].uri.substring(result.assets[0].uri.lastIndexOf('/') + 1);
-        const imageRef = storageRef(storage, `profile_images/${user?.id}/${filename}`);
-        await uploadBytes(imageRef, blob);
-        const url = await getDownloadURL(imageRef);
-        await user?.update({ unsafeMetadata: { profileImageUrl: url } });
-        setUserData(prev => ({ ...prev, profileImage: url }));
+        const file = new File([blob], `profile.${fileExtension}`, { type: `image/${fileExtension}` });
+        
+        await user.setProfileImage({
+          file: file
+        });
+
+        // Update Firestore document
+        const userRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserData;
+          // Update both driver and user profile image URLs
+          const updateData: any = {
+            profile_image_url: uploadedImageUrl
+          };
+          
+          // If user is a driver, also update the driver profile image
+          if (userData.driver?.is_active) {
+            updateData['driver.profile_image_url'] = uploadedImageUrl;
+          }
+          
+          await updateDoc(userRef, updateData);
+        } else {
+          // Create a new user document with profile image
+          await setDoc(userRef, {
+            userId: user.id,
+            email: user.primaryEmailAddress?.emailAddress,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            createdAt: new Date().toISOString(),
+            profile_image_url: uploadedImageUrl
+          });
+        }
+
+        // Update profile image state with the Cloudinary URL
+        setUserData(prev => ({ ...prev, profileImage: uploadedImageUrl }));
+        
+        // Refresh the profile image in the context
+        await refreshProfileImage();
+        
         Alert.alert(
           language === 'ar' ? 'نجاح' : 'Success',
-          language === 'ar' ? 'تم تحديث الصورة بنجاح' : 'Image updated successfully'
+          language === 'ar' ? 'تم تحديث صورة البروفايل بنجاح' : 'Profile picture updated successfully'
         );
+
+        // Trigger haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Profile image upload error:', error);
       Alert.alert(
         language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث الصورة' : 'Error updating image'
+        language === 'ar' ? 'حدث خطأ أثناء تحديث صورة البروفايل' : 'Error updating profile picture'
       );
+      // Revert to previous image if available
+      setUserData(prev => ({ ...prev, profileImage: user?.imageUrl || null }));
     } finally {
       setIsUploading(false);
     }
@@ -316,25 +402,53 @@ const ProfileEdit = () => {
 
   const handleCarImagePick = async () => {
     try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
+          language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.'
+        );
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [16, 9],
-        quality: 0.5,
+        quality: 0.8,
       });
 
-      if (!result.canceled) {
-        setIsUploading(true);
-        const response = await fetch(result.assets[0].uri);
-        const blob = await response.blob();
-        const filename = result.assets[0].uri.substring(result.assets[0].uri.lastIndexOf('/') + 1);
-        const imageRef = storageRef(storage, `car_images/${user?.id}/${filename}`);
-        await uploadBytes(imageRef, blob);
-        const url = await getDownloadURL(imageRef);
-        const userRef = doc(db, 'users', user?.id || '');
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      if (!asset?.uri) return;
+
+      // Validate file type
+      const fileExtension = asset.uri.split('.').pop()?.toLowerCase();
+      if (!['jpg', 'jpeg', 'png'].includes(fileExtension || '')) {
+        Alert.alert(
+          language === 'ar' ? 'خطأ' : 'Error',
+          language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.'
+        );
+        return;
+      }
+
+      setIsUploading(true);
+
+      // Upload to Cloudinary
+      const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
+
+      if (!uploadedImageUrl) {
+        throw new Error(language === 'ar' ? 'فشل في تحميل صورة السيارة' : 'Failed to upload car image');
+      }
+
+      // Update Firestore document
+      if (user?.id) {
+        const userRef = doc(db, 'users', user.id);
         await updateDoc(userRef, {
-          'driver.car_image_url': url
+          'driver.car_image_url': uploadedImageUrl
         });
+
         setUserData(prev => {
           if (!prev.data) return prev;
           return {
@@ -343,7 +457,7 @@ const ProfileEdit = () => {
               ...prev.data,
               driver: {
                 ...prev.data.driver,
-                car_image_url: url,
+                car_image_url: uploadedImageUrl,
                 is_active: prev.data.driver?.is_active || false,
                 car_type: prev.data.driver?.car_type || '',
                 car_seats: prev.data.driver?.car_seats || 0,
@@ -353,19 +467,88 @@ const ProfileEdit = () => {
             }
           };
         });
+
         Alert.alert(
           language === 'ar' ? 'نجاح' : 'Success',
           language === 'ar' ? 'تم تحديث صورة السيارة بنجاح' : 'Car image updated successfully'
         );
+
+        // Trigger haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
-      console.error('Error uploading car image:', error);
+      console.error('Car image upload error:', error);
       Alert.alert(
         language === 'ar' ? 'خطأ' : 'Error',
         language === 'ar' ? 'حدث خطأ أثناء تحديث صورة السيارة' : 'Error updating car image'
       );
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'يرجى ملء جميع الحقول' : 'Please fill in all fields'
+      );
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'كلمات المرور الجديدة غير متطابقة' : 'New passwords do not match'
+      );
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        language === 'ar' ? 'يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل' : 'New password must be at least 8 characters'
+      );
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+      await user?.updatePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+
+      // Clear password fields
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      setShowChangePassword(false);
+
+      // Show success message
+      Alert.alert(
+        language === 'ar' ? 'نجاح' : 'Success',
+        language === 'ar' ? 'تم تغيير كلمة المرور بنجاح' : 'Password changed successfully'
+      );
+
+      // Trigger haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      let errorMessage = language === 'ar' ? 'حدث خطأ أثناء تغيير كلمة المرور' : 'Error changing password';
+      
+      if (error.errors?.[0]?.message === 'Current password is incorrect') {
+        errorMessage = language === 'ar' ? 'كلمة المرور الحالية غير صحيحة' : 'Current password is incorrect';
+      }
+      
+      Alert.alert(
+        language === 'ar' ? 'خطأ' : 'Error',
+        errorMessage
+      );
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -412,13 +595,9 @@ const ProfileEdit = () => {
                 />
                 <TouchableOpacity
                   onPress={handleImagePick}
-                  className="absolute bottom-2 right-2 bg-white rounded-full p-1.5"
+                  className="absolute bottom-2 right-2 bg-orange-500 rounded-full p-2"
                 >
-                  <Image 
-                    source={uploadIcon} 
-                    style={{ width: 20, height: 20 }} 
-                    resizeMode="contain"
-                  />
+                  <MaterialCommunityIcons name="camera" size={20} color="white" />
                 </TouchableOpacity>
               </TouchableOpacity>
             </View>
@@ -436,13 +615,9 @@ const ProfileEdit = () => {
                   />
                   <TouchableOpacity
                     onPress={handleCarImagePick}
-                    className="absolute bottom-2 right-2 bg-white rounded-full p-1.5"
+                    className="absolute bottom-2 right-2 bg-orange-500 rounded-full p-2"
                   >
-                    <Image 
-                      source={uploadIcon} 
-                      style={{ width: 20, height: 20 }} 
-                      resizeMode="contain"
-                    />
+                    <MaterialCommunityIcons name="camera" size={20} color="white" />
                   </TouchableOpacity>
                 </TouchableOpacity>
               </View>
@@ -524,84 +699,23 @@ const ProfileEdit = () => {
               </View>
             </View>
 
-            {/* Notifications
+            {/* Change Password Button */}
             <TouchableOpacity
-              onPress={toggleNotifications}
-              activeOpacity={0.7}
-              className={`flex-row items-center mb-3 min-h-[44px] ${language === 'ar' ? 'flex-row-reverse' : ''}`}
+              onPress={() => setShowChangePassword(true)}
+              className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}
             >
               <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${language === 'ar' ? 'ml-3.5' : 'mr-3.5'}`}>
-                <MaterialIcons name="notifications" size={22} color="#fff" />
+                <MaterialIcons name="lock" size={22} color="#fff" />
               </View>
-              <View className={`flex-1 flex-row items-center ${language === 'ar' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
-                <Text className={`text-base font-bold text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  {language === 'ar' ? 'الإشعارات' : 'Notifications'}
-                </Text>
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={toggleNotifications}
-                  trackColor={{ false: '#d1d5db', true: '#f97316' }}
-                  thumbColor="#fff"
-                />
-              </View>
-            </TouchableOpacity> */}
+              <Text className={`text-base font-bold text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
-
-        {/* Edit Field Modal */}
-        <Modal
-          visible={!!editingField}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setEditingField(null)}
-        >
-          <View className="flex-1 bg-black/50 justify-center items-center px-5">
-            <View className="bg-white w-full rounded-xl p-4">
-              <TextInput
-                value={editValues[editingField as keyof typeof editValues]}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, [editingField as string]: text }))}
-                className="border border-gray-200 rounded-xl p-3.5 mb-4 text-[15px]"
-                placeholder={language === 'ar' ? getArabicPlaceholder(editingField) : `Enter ${editingField}`}
-                keyboardType={editingField === 'carSeats' || editingField === 'phoneNumber' ? 'numeric' : 'default'}
-                textAlign={language === 'ar' ? 'right' : 'left'}
-                style={{
-                  fontFamily: language === 'ar' ? 'Cairo-Regular' : 'PlusJakartaSans-Regular'
-                }}
-              />
-              <View className={`flex-row justify-end space-x-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                <TouchableOpacity
-                  onPress={() => setEditingField(null)}
-                  className="px-4 py-2"
-                >
-                  <Text className="text-gray-500 text-[15px]">{language === 'ar' ? 'إلغاء' : 'Cancel'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleEditField(editingField as string)}
-                  className="bg-orange-500 px-4 py-2 rounded-lg"
-                >
-                  <Text className="text-white text-[15px]">{language === 'ar' ? 'حفظ' : 'Save'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     </>
   );
-};
-
-// Helper function for Arabic placeholders
-const getArabicPlaceholder = (field: string | null) => {
-  switch (field) {
-    case 'carType':
-      return 'أدخل نوع السيارة';
-    case 'carSeats':
-      return 'أدخل عدد المقاعد';
-    case 'phoneNumber':
-      return 'أدخل رقم الهاتف';
-    default:
-      return '';
-  }
 };
 
 export default ProfileEdit;

@@ -53,6 +53,7 @@ import repeat from "@/assets/icons/repeat.png";
 import smoking from "@/assets/icons/smoking.png";
 import music from "@/assets/icons/music.png";
 import children from "@/assets/icons/children.png";
+import translate from "@/assets/icons/Translate.png";
 
 
 export const images = {
@@ -69,6 +70,7 @@ export const images = {
 };
 
 export const icons = {
+    translate,
     repeat,
     filter,
     car,

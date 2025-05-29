@@ -94,6 +94,7 @@ export default function Home() {
   const suggestedRidesRef = useRef<SuggestedRidesRef>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true);
+  const [headerRefreshKey, setHeaderRefreshKey] = useState(0);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -120,6 +121,7 @@ export default function Home() {
         
         const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
         setProfileImageUrl(imageUrl);
+        setHeaderRefreshKey(prev => prev + 1);
       } else {
         console.log('User document does not exist');
         setIsDriver(false);
@@ -324,6 +326,7 @@ export default function Home() {
         title={t.Home}
         profileImageUrl={profileImageUrl}
         showProfileImage={true}
+        key={headerRefreshKey}
       />
 
       <FlatList 

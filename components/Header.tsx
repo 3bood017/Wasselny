@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -6,6 +6,10 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { useUser } from '@clerk/clerk-expo';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useProfile } from '@/context/ProfileContext';
 
 function CustomMenuIcon({ isRTL }: { isRTL: boolean }) {
   return (
@@ -44,10 +48,12 @@ interface HeaderProps {
   showSideMenu?: boolean;
 }
 
-export default function Header({ profileImageUrl, title, showProfileImage = true, showSideMenu = true }: HeaderProps) {
+export default function Header({ profileImageUrl: propProfileImageUrl, title, showProfileImage = true, showSideMenu = true }: HeaderProps) {
   const { t, language, isRTL } = useLanguage();
   const { unreadCount } = useNotifications();
   const navigation = useNavigation<DrawerNavigationProp<any>>();
+  const { user } = useUser();
+  const { profileImageUrl } = useProfile();
 
   const handleBackPress = () => {
     router.back();
@@ -86,9 +92,9 @@ export default function Header({ profileImageUrl, title, showProfileImage = true
               )}
             </TouchableOpacity>
           </View>
-          <View className="absolute left-0 right-0 items-center">
-            <Text className={`text-xl font-CairoBold text-gray-900`}>{title}</Text>
-          </View>
+          
+          <Text className={`text-xl font-CairoBold text-gray-900`}>{title}</Text>
+          
           {showSideMenu ? (
             <TouchableOpacity
               onPress={() => navigation.openDrawer()}
@@ -125,6 +131,7 @@ export default function Header({ profileImageUrl, title, showProfileImage = true
           <View className="absolute left-0 right-0 items-center">
             <Text className="text-xl font-bold text-gray-900">{title || t.Home}</Text>
           </View>
+          
           <View className="flex-row items-center space-x-2">
             {showProfileImage && (
               <TouchableOpacity

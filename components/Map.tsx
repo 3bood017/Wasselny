@@ -163,6 +163,11 @@ const Map = ({
         loadingEnabled={true}
         loadingIndicatorColor="#F97316"
         loadingBackgroundColor="#FFFFFF"
+              showsCompass={true}
+              showsScale={true}
+              showsTraffic={false}
+              showsBuildings={true}
+              showsIndoors={true}
         minZoomLevel={5}
         maxZoomLevel={20}
         onPress={handleMapPress}
@@ -170,7 +175,7 @@ const Map = ({
           {
             featureType: "poi",
             elementType: "labels",
-            stylers: [{ visibility: "off" }],
+            stylers: [{ visibility: "on" }],
           },
         ]}
       >

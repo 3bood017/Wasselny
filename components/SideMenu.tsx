@@ -10,8 +10,10 @@ import * as Location from 'expo-location';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useLocationStore } from '@/store';
 import { DrawerContentScrollView, DrawerContentComponentProps } from '@react-navigation/drawer';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useProfile } from '@/context/ProfileContext';
+import { icons } from '@/constants';
 
 export default function SideMenu(props: DrawerContentComponentProps) {
   const { language, setLanguage, t } = useLanguage();
@@ -19,41 +21,81 @@ export default function SideMenu(props: DrawerContentComponentProps) {
   const { signOut } = useAuth();
   const { user } = useUser();
   const isRTL = language === 'ar';
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const { profileImageUrl, refreshProfileImage } = useProfile();
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [savedLocations, setSavedLocations] = useState<Array<{id: string, name: string, isDefault: boolean}>>([]);
+  const [isDriver, setIsDriver] = useState(false);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchSavedLocations = async () => {
       if (!user?.id) return;
       
       try {
-        const userRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userRef);
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
-          setProfileImageUrl(imageUrl);
-        }
-
-        // Fetch saved locations
+        // Set up real-time listener for saved locations
         const locationsRef = collection(db, 'user_locations');
         const q = query(locationsRef, where('userId', '==', user.id));
-        const querySnapshot = await getDocs(q);
         
-        const locations = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Array<{id: string, name: string, isDefault: boolean}>;
-        
-        setSavedLocations(locations);
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const locations = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Array<{id: string, name: string, isDefault: boolean}>;
+          
+          setSavedLocations(locations);
+        });
+
+        return () => unsubscribe();
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('Error fetching saved locations:', error);
       }
     };
 
-    fetchUserProfile();
+    fetchSavedLocations();
+  }, [user?.id]);
+
+  // Add real-time listener for current location
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const userRef = doc(db, 'users', user.id);
+    const unsubscribe = onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        const userData = doc.data();
+        // Update profile image if changed
+        const imageUrl = userData.profile_image_url || userData.driver?.profile_image_url || null;
+        if (imageUrl !== profileImageUrl) {
+          refreshProfileImage();
+        }
+        
+        // Update current location if changed
+        const currentLocation = userData.current_location || null;
+        if (currentLocation && currentLocation !== userAddress) {
+          // Update the location store
+          useLocationStore.setState({ userAddress: currentLocation });
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.id, profileImageUrl, userAddress]);
+
+  // Add driver status check
+  useEffect(() => {
+    const checkDriverStatus = async () => {
+      if (!user?.id) return;
+
+      const userRef = doc(db, 'users', user.id);
+      const unsubscribe = onSnapshot(userRef, (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data();
+          setIsDriver(userData.driver?.is_active || false);
+        }
+      });
+
+      return () => unsubscribe();
+    };
+
+    checkDriverStatus();
   }, [user?.id]);
 
   const toggleLocation = async () => {
@@ -158,13 +200,21 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
         >
           <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-            <MaterialIcons name="language" size={22} color="#fff" />
+            <MaterialIcons name="translate" size={22} color="#fff" />
           </View>
           <View className="flex-1">
             <Text className={`text-base font-CairoBold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.language}</Text>
-            <Text className={`text-gray-500 font-CairoRegular text-sm ${isRTL ? 'text-right' : 'text-left'}`}>
-              {language === 'en' ? 'العربية' : 'English'}
-            </Text>
+            <View className={`flex-row items-center ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <Text className={`text-gray-500 font-CairoRegular text-sm ${isRTL ? 'text-right ml-2' : 'text-left mr-2'}`}>
+                {language === 'en' ? 'العربية' : 'English'}
+              </Text>
+              <MaterialIcons 
+                name="swap-horiz" 
+                size={16} 
+                color="#6B7280" 
+                style={{ transform: [{ rotate: isRTL ? '180deg' : '0deg' }] }}
+              />
+            </View>
           </View>
         </TouchableOpacity>
 
@@ -174,7 +224,8 @@ export default function SideMenu(props: DrawerContentComponentProps) {
           className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
         >
           <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-            <MaterialIcons name="location-on" size={22} color="#fff" />
+            <Image source={icons.pin} className='w-5 h-5' tintColor={"white"} resizeMode='contain'/>
+            {/* <MaterialIcons name="location-on" size={22} color="#fff" /> */}
           </View>
           <View className="flex-1">
             <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t.location}</Text>
@@ -242,42 +293,46 @@ export default function SideMenu(props: DrawerContentComponentProps) {
         {/* Divider */}
         <View style={{ height: 1, backgroundColor: '#f3f4f6', marginVertical: 10 }} />
 
-{/* Rides Section */}
-<Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>
-          {language === 'ar' ? 'الرحلات' : 'Rides'}
-        </Text>
-        
-        <TouchableOpacity
-          onPress={() => {
-            router.push('/(root)/(tabs)/rides');
-            props.navigation.closeDrawer();
-          }}
-          activeOpacity={0.7}
-          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
-        >
-          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-            <MaterialIcons name="directions-car" size={22} color="#fff" />
-          </View>
-          <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'رحلاتي' : 'My Rides'}
-          </Text>
-        </TouchableOpacity>
+        {/* Rides Section - Only show for drivers */}
+        {isDriver && (
+          <>
+            <Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>
+              {language === 'ar' ? 'الرحلات' : 'Rides'}
+            </Text>
+            
+            <TouchableOpacity
+              onPress={() => {
+                router.push('/(root)/(tabs)/rides');
+                props.navigation.closeDrawer();
+              }}
+              activeOpacity={0.7}
+              className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+            >
+              <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+                <MaterialIcons name="directions-car" size={22} color="#fff" />
+              </View>
+              <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'رحلاتي' : 'My Rides'}
+              </Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => {
-            router.push('/(root)/create-ride');
-            props.navigation.closeDrawer();
-          }}
-          activeOpacity={0.7}
-          className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
-        >
-          <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
-            <MaterialIcons name="add-circle" size={22} color="#fff" />
-          </View>
-          <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
-            {language === 'ar' ? 'إنشاء رحلة' : 'Create Ride'}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                router.push('/(root)/create-ride');
+                props.navigation.closeDrawer();
+              }}
+              activeOpacity={0.7}
+              className={`flex-row items-center mb-3 min-h-[44px] ${isRTL ? 'flex-row-reverse' : ''}`}
+            >
+              <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${isRTL ? 'ml-3.5' : 'mr-3.5'}`}>
+                <MaterialIcons name="add-circle" size={22} color="#fff" />
+              </View>
+              <Text className={`text-base font-CairoBold mt-2 text-gray-800 ${isRTL ? 'text-right' : 'text-left'}`}>
+                {language === 'ar' ? 'إنشاء رحلة' : 'Create Ride'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Support Section */}
         <Text className={`text-gray-400 text-xs mb-2 mt-2 font-CairoBold tracking-wide ${isRTL ? 'text-right' : 'text-left'}`}>{t.support}</Text>

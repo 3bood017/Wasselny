@@ -11,6 +11,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { LinearGradient } from 'expo-linear-gradient';
+import Header from '@/components/Header';
 
 interface SavedLocation {
   id: string;
@@ -26,6 +27,11 @@ export default function LocationScreen() {
   const { language } = useLanguage();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
+  const [buttonLoading, setButtonLoading] = useState<{
+    saveLocation?: boolean;
+    setDefault?: string;
+    delete?: string;
+  }>({});
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<SavedLocation | null>(null);
@@ -33,11 +39,19 @@ export default function LocationScreen() {
   const [locationName, setLocationName] = useState('');
   const [locationAddresses, setLocationAddresses] = useState<{[key: string]: string}>({});
   const [mapRegion, setMapRegion] = useState({
-    latitude: 31.9522,
+    latitude: 31.9522,  // Center of Palestine
     longitude: 35.2332,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
+    latitudeDelta: 0.5,  // Closer zoom level
+    longitudeDelta: 0.5,
   });
+
+  // Add map boundaries for Palestine
+  const palestineBounds = {
+    north: 33.3,    // Northernmost point
+    south: 31.2,    // Southernmost point
+    east: 35.5,     // Easternmost point
+    west: 34.2      // Westernmost point
+  };
 
   // Get address from coordinates with retry mechanism
   const getAddressFromCoordinates = useCallback(async (latitude: number, longitude: number, retries = 3): Promise<string> => {
@@ -54,7 +68,8 @@ export default function LocationScreen() {
             address.street,
             address.district,
             address.city,
-            address.region
+            address.region,
+            address.country
           ].filter(Boolean);
           
           if (addressParts.length > 0) {
@@ -62,7 +77,28 @@ export default function LocationScreen() {
           }
         }
         
-        // If no address found, wait before retrying
+        // If no address found, try to get a more general location
+        if (i === retries - 1) {
+          const generalLocation = await Location.reverseGeocodeAsync({
+            latitude,
+            longitude
+          });
+          
+          if (generalLocation && generalLocation[0]) {
+            const generalAddress = generalLocation[0];
+            const generalParts = [
+              generalAddress.city,
+              generalAddress.region,
+              generalAddress.country
+            ].filter(Boolean);
+            
+            if (generalParts.length > 0) {
+              return generalParts.join(', ');
+            }
+          }
+        }
+        
+        // If still no address found, wait before retrying
         if (i < retries - 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -74,7 +110,8 @@ export default function LocationScreen() {
       }
     }
     
-    return language === 'ar' ? 'العنوان غير متوفر' : 'Address not available';
+    // If all retries failed, return coordinates as fallback
+    return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
   }, [language]);
 
   // Get user's current location with optimized settings
@@ -106,18 +143,49 @@ export default function LocationScreen() {
         distanceInterval: 10
       });
       
-      setCurrentLocation(location);
+      // Check if location is within Palestine bounds
+      const isInPalestine = 
+        location.coords.latitude >= palestineBounds.south &&
+        location.coords.latitude <= palestineBounds.north &&
+        location.coords.longitude >= palestineBounds.west &&
+        location.coords.longitude <= palestineBounds.east;
+
+      if (!isInPalestine) {
+        Alert.alert(
+          language === 'ar' ? 'تنبيه' : 'Alert',
+          language === 'ar' ? 'يبدو أنك خارج حدود فلسطين. سيتم عرض الخريطة على فلسطين.' : 'You appear to be outside Palestine. The map will show Palestine.',
+          [{ text: 'OK' }]
+        );
+        // Set to center of Palestine
+        setCurrentLocation({
+          coords: {
+            latitude: 31.9522,
+            longitude: 35.2332,
+            altitude: null,
+            accuracy: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null
+          },
+          timestamp: Date.now()
+        });
+      } else {
+        setCurrentLocation(location);
+      }
       
-      // Update map region
+      // Update map region with appropriate zoom level
       setMapRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitude: isInPalestine ? location.coords.latitude : 31.9522,
+        longitude: isInPalestine ? location.coords.longitude : 35.2332,
+        latitudeDelta: 0.5,
+        longitudeDelta: 0.5,
       });
 
       // Get address for current location
-      const address = await getAddressFromCoordinates(location.coords.latitude, location.coords.longitude);
+      const address = await getAddressFromCoordinates(
+        isInPalestine ? location.coords.latitude : 31.9522,
+        isInPalestine ? location.coords.longitude : 35.2332
+      );
       console.log('Current location address:', address);
 
     } catch (error) {
@@ -232,6 +300,7 @@ export default function LocationScreen() {
     }
 
     try {
+      setButtonLoading(prev => ({ ...prev, saveLocation: true }));
       const locationData = {
         userId: user?.id,
         name: locationName.trim(),
@@ -262,13 +331,15 @@ export default function LocationScreen() {
         language === 'ar' ? 'خطأ' : 'Error',
         language === 'ar' ? 'حدث خطأ أثناء حفظ الموقع' : 'Error saving location'
       );
+    } finally {
+      setButtonLoading(prev => ({ ...prev, saveLocation: false }));
     }
   };
 
   // Set location as default
   const setAsDefault = async (location: SavedLocation) => {
     try {
-      setLoading(true);
+      setButtonLoading(prev => ({ ...prev, setDefault: location.id }));
       
       // If there's already a default location, unset it
       const previousDefault = savedLocations.find(loc => loc.isDefault);
@@ -305,13 +376,14 @@ export default function LocationScreen() {
         language === 'ar' ? 'حدث خطأ أثناء تعيين الموقع الافتراضي' : 'Error setting default location'
       );
     } finally {
-      setLoading(false);
+      setButtonLoading(prev => ({ ...prev, setDefault: undefined }));
     }
   };
 
   // Delete location
   const deleteLocation = async (locationId: string) => {
     try {
+      setButtonLoading(prev => ({ ...prev, delete: locationId }));
       await deleteDoc(doc(db, 'user_locations', locationId));
       setSavedLocations(savedLocations.filter(loc => loc.id !== locationId));
       Alert.alert(
@@ -324,6 +396,8 @@ export default function LocationScreen() {
         language === 'ar' ? 'خطأ' : 'Error',
         language === 'ar' ? 'حدث خطأ أثناء حذف الموقع' : 'Error deleting location'
       );
+    } finally {
+      setButtonLoading(prev => ({ ...prev, delete: undefined }));
     }
   };
 
@@ -355,15 +429,37 @@ export default function LocationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <ScrollView className="flex-1">
+        <Header title={language === 'ar' ? 'ادارة الموقع ' : 'Manage Location' } showProfileImage={false} showSideMenu={false} />
+        <ScrollView className="flex-1">
         {/* Map View */}
-        <View className="h-[300px]">
+        <View className="h-[280px]">
           {currentLocation ? (
             <MapView
               provider={PROVIDER_GOOGLE}
-              className="w-full h-full"
+              className="w-full h-full rounded-2xl"
               region={mapRegion}
               onRegionChangeComplete={setMapRegion}
+              minZoomLevel={7}  // Prevent zooming out too far
+              maxZoomLevel={18} // Prevent zooming in too close
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+              showsCompass={true}
+              showsScale={true}
+              showsTraffic={false}
+              showsBuildings={true}
+              showsIndoors={true}
+              showsPointsOfInterest={true}
+        zoomEnabled={true}
+        loadingEnabled={true}
+        loadingIndicatorColor="#F97316"
+        loadingBackgroundColor="#FFFFFF"
+        customMapStyle={[
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "on" }],
+          },
+        ]}
             >
               <Marker
                 coordinate={{
@@ -400,12 +496,16 @@ export default function LocationScreen() {
           <TouchableOpacity
             onPress={saveNewLocation}
             className="bg-orange-500 rounded-lg p-4 mb-4 flex-row items-center justify-center"
-            disabled={!currentLocation || loading}
+            disabled={!currentLocation || loading || buttonLoading.saveLocation}
           >
-            <MaterialIcons name="add-location" size={24} color="white" className="mr-2" />
-            <Text className={`text-white text-center ml-2 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-              {loading 
-                ? (language === 'ar' ? 'جاري التحميل...' : 'Loading...')
+            {buttonLoading.saveLocation ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <MaterialIcons name="add-location" size={24} color="white" className={language === 'ar' ? 'ml-2' : 'mr-2'} />
+            )}
+            <Text className={`text-white text-center ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+              {buttonLoading.saveLocation 
+                ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...')
                 : (language === 'ar' ? 'حفظ الموقع الحالي' : 'Save Current Location')}
             </Text>
           </TouchableOpacity>
@@ -437,38 +537,48 @@ export default function LocationScreen() {
                 <TouchableOpacity
                   key={location.id}
                   onPress={() => setAsDefault(location)}
-                  className="p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm relative"
+                  className={`p-4 mb-3 rounded-xl border border-gray-200 bg-white shadow-sm relative ${language === 'ar' ? 'rtl' : 'ltr'}`}
+                  disabled={buttonLoading.setDefault === location.id || buttonLoading.delete === location.id}
                 >
                   <TouchableOpacity
                     onPress={(e) => {
                       e.stopPropagation();
                       confirmDelete(location);
                     }}
-                    className={`absolute top-1.5 ${isArabicName ? 'left-1.5' : 'right-1.5'} z-10`}
+                    className={`absolute top-1.5 ${language === 'ar' ? 'left-1.5' : 'right-1.5'} z-10`}
+                    disabled={buttonLoading.delete === location.id}
                   >
-                    <MaterialIcons name="close" size={16} color="#ef4444" />
+                    {buttonLoading.delete === location.id ? (
+                      <ActivityIndicator size="small" color="#ef4444" />
+                    ) : (
+                      <MaterialIcons name="close" size={16} color="#ef4444" />
+                    )}
                   </TouchableOpacity>
 
-                  <View className={`flex-row items-center justify-between ${isArabicName ? 'flex-row-reverse' : ''}`}>
-                    <View className="flex-1">
-                      <Text className={`text-base ${isArabicName ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
+                  <View className={`flex-row items-center justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                    <View className={`flex-1 ${language === 'ar' ? 'items-end' : 'items-start'}`}>
+                      <Text className={`text-base ${language === 'ar' ? 'font-CairoBold text-right' : 'font-CairoBold text-left'}`}>
                         {location.name}
                       </Text>
-                      <Text className={`text-sm text-gray-500 mt-0.5 ${isArabicName ? 'font-Cairo text-right' : 'font-Jakarta text-left'}`}>
+                      <Text className={`text-sm text-gray-500 mt-0.5 ${language === 'ar' ? 'font-Cairo text-right' : 'font-Jakarta text-left'}`}>
                         {locationAddresses[location.id] || (language === 'ar' ? 'جاري تحميل العنوان...' : 'Loading address...')}
                       </Text>
                       {location.isDefault && (
-                        <Text className={`text-xs text-orange-500 mt-1 ${isArabicName ? 'text-right' : 'text-left'}`}>
+                        <Text className={`text-xs text-orange-500 mt-1 font-CairoSemiBold ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                           {language === 'ar' ? 'الموقع الافتراضي' : 'Default Location'}
                         </Text>
                       )}
                     </View>
-                    {location.isDefault ? (
-                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 items-center justify-center ${isArabicName ? 'ml-3' : 'mr-3'}`}>
+                    {buttonLoading.setDefault === location.id ? (
+                      <View className={`w-7 h-7 items-center justify-center ${language === 'ar' ? 'ml-3' : 'mr-3'}`}>
+                        <ActivityIndicator size="small" color="#f97316" />
+                      </View>
+                    ) : location.isDefault ? (
+                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 items-center justify-center ${language === 'ar' ? 'ml-3' : 'mr-3'}`}>
                         <View className="w-4 h-4 rounded-full bg-orange-500" />
                       </View>
                     ) : (
-                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 ${isArabicName ? 'ml-3' : 'mr-3'}`} />
+                      <View className={`w-7 h-7 rounded-full border-2 border-orange-500 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -486,7 +596,7 @@ export default function LocationScreen() {
         onRequestClose={() => setShowNameModal(false)}
       >
         <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="bg-white w-[90%] rounded-2xl p-6">
+          <View className={`bg-white w-[90%] rounded-2xl p-6 ${language === 'ar' ? 'rtl' : 'ltr'}`}>
             <Text className={`text-xl mb-4 ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'}`}>
               {language === 'ar' ? 'اسم الموقع' : 'Location Name'}
             </Text>
@@ -508,6 +618,7 @@ export default function LocationScreen() {
                   setLocationName('');
                 }}
                 className="px-4 py-2 rounded-lg bg-gray-200"
+                disabled={buttonLoading.saveLocation}
               >
                 <Text className={`${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
                   {language === 'ar' ? 'إلغاء' : 'Cancel'}
@@ -517,11 +628,15 @@ export default function LocationScreen() {
               <TouchableOpacity
                 onPress={handleSaveLocation}
                 className="px-4 py-2 rounded-lg bg-orange-500"
-                disabled={loading}
+                disabled={buttonLoading.saveLocation}
               >
-                <Text className={`text-white ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-                  {loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ' : 'Save')}
-                </Text>
+                {buttonLoading.saveLocation ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className={`text-white ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+                    {language === 'ar' ? 'حفظ' : 'Save'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

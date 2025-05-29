@@ -64,15 +64,9 @@ const RootLayout = () => {
                    headerTitleAlign: 'center',
                  }}
                />
-               <Stack.Screen name="location" options={{
-                   headerTitle: language === 'ar' ? 'إدارة المواقع' : 'Manage Locations',
-                   headerTitleStyle: {
-                     fontFamily: language === 'ar' ? 'Cairo-Bold' : 'PlusJakartaSans-Bold',
-                     fontSize: 18,
-                   },
-                   headerTitleAlign: 'center',
-                 }}
-               />
+               <Stack.Screen name="location" options={{ headerShown: false }} />
+                 
+               
                
 
 
