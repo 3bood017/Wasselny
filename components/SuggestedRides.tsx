@@ -558,7 +558,7 @@ const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProp
         style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
       >
         <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'}`}>
-          <View className={`px-2 py-1 rounded-full ${statusColors.bg}`}>
+          <View className={`px-2 pt-2 pb-1  rounded-full ${statusColors.bg}`}>
             <Text className={`text-xs font-CairoMedium ${statusColors.text}`}>
               {item.is_recurring ? (language === 'ar' ? 'متكرر' : 'Recurring') : statusText}
             </Text>

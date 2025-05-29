@@ -431,16 +431,68 @@ const AllRides = () => {
     const formattedTime = time.includes(':') ? formatTimeTo12Hour(time) : time;
     const dayOfWeek = getDayOfWeek(item.ride_datetime, language);
     
+    // Get status color and text
+    const getStatusInfo = (status: string, recurring: boolean) => {
+      if (recurring) {
+        return {
+          bgColor: 'bg-orange-50',
+          textColor: 'text-orange-400',
+          text: language === 'ar' ? 'متكرر' : 'Recurring'
+        };
+      }
+      
+      switch (status.toLowerCase()) {
+        case 'available':
+          return {
+            bgColor: 'bg-green-50',
+            textColor: 'text-green-600',
+            text: language === 'ar' ? 'متاح' : 'Available'
+          };
+        case 'in_progress':
+          return {
+            bgColor: 'bg-blue-50',
+            textColor: 'text-blue-600',
+            text: language === 'ar' ? 'قيد التنفيذ' : 'In Progress'
+          };
+        case 'completed':
+          return {
+            bgColor: 'bg-gray-50',
+            textColor: 'text-gray-600',
+            text: language === 'ar' ? 'مكتمل' : 'Completed'
+          };
+        case 'cancelled':
+          return {
+            bgColor: 'bg-red-50',
+            textColor: 'text-red-600',
+            text: language === 'ar' ? 'ملغي' : 'Cancelled'
+          };
+        case 'full':
+          return {
+            bgColor: 'bg-red-50',
+            textColor: 'text-red-600',
+            text: language === 'ar' ? 'ممتلئ' : 'Full'
+          };
+        default:
+          return {
+            bgColor: 'bg-gray-50',
+            textColor: 'text-gray-600',
+            text: language === 'ar' ? 'غير معروف' : 'Unknown'
+          };
+      }
+    };
+
+    const statusInfo = getStatusInfo(item.status, item.recurring);
+    
     return (
       <TouchableOpacity
         onPress={() => router.push(`/ride-details/${item.id}`)}
-        className="bg-white  p-4 rounded-2xl mb-3"
+        className="bg-white p-4 rounded-2xl mb-3"
         style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}
       >
         <View className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'}`}>
-          <View className={`px-2 py-1 rounded-full ${item.recurring ? 'bg-orange-50' : 'bg-green-50'}`}>
-            <Text className={`text-xs font-CairoMedium ${item.recurring ? 'text-orange-400' : 'text-green-600'}`}>
-              {item.recurring ? (language === 'ar' ? 'متكرر' : 'Recurring') : (language === 'ar' ? 'متاح' : 'Available')}
+          <View className={`px-2 pt-2 pb-1 rounded-full ${statusInfo.bgColor}`}>
+            <Text className={`text-xs font-CairoMedium ${statusInfo.textColor}`}>
+              {statusInfo.text}
             </Text>
           </View>
         </View>

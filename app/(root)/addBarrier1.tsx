@@ -447,27 +447,8 @@ const AddBarrier = () => {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
-      <Header pageTitle={language === 'ar' ? 'تحديث حالة الحاجز' : 'Update Barrier Status'} />
-      <View className="px-4 py-2 border-b border-gray-200 bg-white">
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-          className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}
-        >
-          <Image
-            source={icons.backArrow}
-            style={[
-              { width: 20, height: 20, tintColor: '#374151' },
-              language === 'ar' ? { transform: [{ rotate: '180deg' }] } : {}
-            ]}
-          />
-          <Text className={`${language === 'ar' ? 'mr-2' : 'ml-2'} text-gray-700 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-            {language === 'ar' ? 'العودة' : 'Back'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <Header title={language === 'ar' ? 'تحديث حالة الحاجز' : 'Update Barrier'} showSideMenu={false} />
+    
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
