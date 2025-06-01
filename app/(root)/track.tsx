@@ -20,6 +20,8 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
   import { GestureHandlerRootView } from 'react-native-gesture-handler';
   import * as Haptics from 'expo-haptics';
 import Header from '@/components/Header';
+import * as Notifications from 'expo-notifications';
+import { sendLocationUpdateNotification } from '@/lib/notifications';
   
   // Types
   interface AppUser {
@@ -375,6 +377,27 @@ import Header from '@/components/Header';
       }
     };
   
+    // Handle notification press
+    const handleNotification = (notification: Notifications.NotificationResponse) => {
+      const data = notification.notification.request.content.data;
+      
+      if (data.type === 'location_share' || data.type === 'location_update') {
+        // Navigate to track user page
+        router.push(`/track-user/${data.sharerId}`);
+      }
+    };
+
+    // Set up notification response listener
+    useEffect(() => {
+      const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+        handleNotification(response);
+      });
+
+      return () => {
+        Notifications.removeNotificationSubscription(responseListener);
+      };
+    }, []);
+  
     // Update shared location in Firestore
     const updateSharedLocation = async (latitude: number, longitude: number) => {
       if (!user?.id || !selectedUser) return;
@@ -389,6 +412,14 @@ import Header from '@/components/Header';
           last_updated: new Date().toISOString(),
           is_active: true
         }, { merge: true });
+
+        // Send location update notification
+        await sendLocationUpdateNotification(
+          selectedUser.id,
+          user?.fullName || (isRTL ? 'مستخدم' : 'A user'),
+          isRTL,
+          user.id
+        );
       } catch (error) {
         console.error('Error updating shared location:', error);
       }

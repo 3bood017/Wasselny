@@ -98,13 +98,62 @@ export const setupNotificationHandler = () => {
   };
 };
 
+// Setup notifications
+export const setupNotifications = async (userId: string): Promise<string | null> => {
+  try {
+    console.log(`[setupNotifications] Starting setup for user: ${userId}`);
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push token for push notification! Notification permissions not granted.');
+      console.log(`[setupNotifications] Notification permissions not granted for user: ${userId}`);
+      return null;
+    }
+
+    console.log(`[setupNotifications] Notification permissions granted for user: ${userId}`);
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('ride-reminders', {
+        name: 'Ride Reminders',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: EXPO_PROJECT_ID,
+    });
+    const pushToken = tokenData.data;
+
+    console.log(`[setupNotifications] Obtained Expo Push Token: ${pushToken} for user: ${userId}`);
+    await saveUserPushToken(userId, pushToken);
+    setupNotificationHandler();
+
+    console.log(`[setupNotifications] Finished setup for user: ${userId}`);
+    return pushToken;
+  } catch (error) {
+    console.error(`[setupNotifications] Error during setup for user: ${userId}:`, error);
+    console.error('Error in setupNotifications:', error);
+    return null;
+  }
+};
+
 // Save user push token to Firestore
 export const saveUserPushToken = async (userId: string, pushToken: string): Promise<void> => {
   try {
+    console.log(`[saveUserPushToken] Saving token ${pushToken} for user: ${userId}`);
     const userRef = doc(db, 'users', userId);
     await setDoc(userRef, { pushToken }, { merge: true });
+    console.log(`[saveUserPushToken] Successfully saved token for user: ${userId}`);
     console.log(`Push token saved for user: ${userId}`);
   } catch (error) {
+    console.error(`[saveUserPushToken] Error saving token for user: ${userId}:`, error);
     console.error('Error saving push token:', error);
   }
 };
@@ -360,46 +409,6 @@ export const scheduleRideNotification = async (
   }
 };
 
-// Setup notifications
-export const setupNotifications = async (userId: string): Promise<string | null> => {
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
-      return null;
-    }
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('ride-reminders', {
-        name: 'Ride Reminders',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: EXPO_PROJECT_ID,
-    });
-    const pushToken = tokenData.data;
-
-    await saveUserPushToken(userId, pushToken);
-    setupNotificationHandler();
-
-    return pushToken;
-  } catch (error) {
-    console.error('Error in setupNotifications:', error);
-    return null;
-  }
-};
-
 // Send ride status notification
 export const sendRideStatusNotification = async (
   userId: string,
@@ -566,6 +575,90 @@ export const sendRideRequestNotification = async (
     return false;
   } catch (error) {
     console.error('Error sending ride request notification:', error);
+    return false;
+  }
+};
+
+// Send location sharing notification (New Function)
+export const sendLocationShareNotification = async (
+  recipientId: string,
+  sharerName: string,
+  isRTL: boolean,
+  sharerId: string
+): Promise<boolean> => {
+  try {
+    const title = 'تمت مشاركة الموقع';
+    const body = `${sharerName} شارك معك موقعه`;
+
+    const notificationId = await scheduleNotification(
+      title,
+      body,
+      new Date(),
+      'location_share',
+      recipientId
+    );
+
+    if (notificationId) {
+      await saveNotificationToDB({
+        user_id: recipientId,
+        type: 'location_share',
+        title,
+        message: body,
+        notification_id: notificationId,
+        read: false,
+        data: {
+          type: 'location_share',
+          sharerId,
+          notificationId
+        }
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error sending location share notification:', error);
+    return false;
+  }
+};
+
+// Send location update notification
+export const sendLocationUpdateNotification = async (
+  recipientId: string,
+  sharerName: string,
+  isRTL: boolean,
+  sharerId: string
+): Promise<boolean> => {
+  try {
+    const title = 'تحديث الموقع';
+    const body = `${sharerName} قام بتحديث موقعه`;
+
+    const notificationId = await scheduleNotification(
+      title,
+      body,
+      new Date(),
+      'location_update',
+      recipientId
+    );
+
+    if (notificationId) {
+      await saveNotificationToDB({
+        user_id: recipientId,
+        type: 'location_update',
+        title,
+        message: body,
+        notification_id: notificationId,
+        read: false,
+        data: {
+          type: 'location_update',
+          sharerId,
+          notificationId
+        }
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error sending location update notification:', error);
     return false;
   }
 };

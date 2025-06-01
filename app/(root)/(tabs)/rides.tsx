@@ -153,8 +153,9 @@ export default function Rides() {
   const [upcomingRides, setUpcomingRides] = useState<RideWithRequests[]>([]);
   const [pastDriverRides, setPastDriverRides] = useState<RideWithRequests[]>([]);
   const [pastPassengerRides, setPastPassengerRides] = useState<RideWithRequests[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'pending' | 'completed' | 'cancelled'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'completed' | 'cancelled'>('all');
   const [rideTypeFilter, setRideTypeFilter] = useState<'all' | 'created' | 'registered'>('all');
+  const [pastRideTypeFilter, setPastRideTypeFilter] = useState<'all' | 'drove' | 'joined'>('all');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const { t, language } = useLanguage();
 
@@ -357,12 +358,9 @@ export default function Rides() {
         })
       );
 
-      console.log('Processed driver rides:', driverRides.length, 'Data:', JSON.stringify(driverRides, null, 2));
-
       const passengerRideIds = passengerRequestsSnapshot.docs.map((doc) => doc.data().ride_id);
       const uniqueRideIds = [...new Set(passengerRideIds)];
 
-      // Fetch passenger rides and filter out null values
       const passengerRidesWithNulls = await Promise.all(
         uniqueRideIds.map(async (rideId) => {
           const rideDoc = await getDoc(doc(db, 'rides', rideId));
@@ -388,37 +386,48 @@ export default function Rides() {
         })
       );
 
-      // Filter out null values to satisfy TypeScript
       const passengerRides: RideWithRequests[] = passengerRidesWithNulls.filter((ride): ride is RideWithRequests => ride !== null);
-
-      console.log('Processed passenger rides:', passengerRides.length, 'Data:', JSON.stringify(passengerRides, null, 2));
 
       const allRides = [...driverRides, ...passengerRides];
 
+      // Updated logic for categorizing rides
       const upcoming = allRides.filter((ride) => {
-        if (ride.is_recurring) {
-          console.log(`Recurring ride included: ${ride.id}, ride_datetime: ${ride.ride_datetime}`);
-          return true;
-        }
         const rideDate = parseRideDateTime(ride.ride_datetime);
         if (!rideDate) {
-          console.log(`Invalid ride_datetime for ride ${ride.id}: ${ride.ride_datetime}`);
           return false;
         }
+
+        // Check if the ride is completed/ended/cancelled
+        const isCompleted = ['completed', 'ended', 'cancelled'].includes(ride.status);
+        
+        // If the ride is completed/ended/cancelled, it should go to past section
+        if (isCompleted) {
+          return false;
+        }
+
+        // For all rides (including recurring), check if the date is in the future
         return rideDate > now;
       });
 
       const past = allRides.filter((ride) => {
-        if (ride.is_recurring) return false;
         const rideDate = parseRideDateTime(ride.ride_datetime);
-        if (!rideDate) return false;
-        return rideDate <= now;
+        if (!rideDate) {
+          return false;
+        }
+
+        // Include in past if:
+        // 1. The ride is completed/ended/cancelled OR
+        // 2. The ride date is in the past (for all rides including recurring)
+        const isCompleted = ['completed', 'ended', 'cancelled'].includes(ride.status);
+        const isPast = rideDate <= now;
+
+        return isCompleted || isPast;
       });
 
       const pastDriver = past.filter((ride) => ride.driver_id === userId);
       const pastPassenger = past.filter((ride) => ride.driver_id !== userId);
 
-      console.log('Upcoming rides:', upcoming.length, 'Data:', JSON.stringify(upcoming, null, 2));
+      console.log('Upcoming rides:', upcoming.length);
       console.log('Past driver rides:', pastDriver.length);
       console.log('Past passenger rides:', pastPassenger.length);
 
@@ -477,14 +486,12 @@ export default function Rides() {
         if (language === 'ar') {
           switch(status) {
             case 'available': return 'متاح';
-            case 'pending': return 'قيد الانتظار';
             case 'completed': return 'مكتمل';
             default: return 'منتهي';
           }
         } else {
           switch(status) {
             case 'available': return 'Available';
-            case 'pending': return 'Pending';
             case 'completed': return 'Completed';
             default: return 'Ended';
           }
@@ -513,7 +520,6 @@ export default function Rides() {
             <View
               className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'} px-3 py-1 rounded-full ${
                 item.status === 'available' ? 'bg-[#E6F4EA]' :
-                item.status === 'pending' ? 'bg-[#FFF3E0]' :
                 item.status === 'completed' ? 'bg-[#E8F0FE]' :
                 'bg-[#FCE8E6]'
               }`}
@@ -521,7 +527,6 @@ export default function Rides() {
               <Text
                 className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${
                   item.status === 'available' ? 'text-[#1E8E3E]' :
-                  item.status === 'pending' ? 'text-[#E65100]' :
                   item.status === 'completed' ? 'text-[#1A73E8]' :
                   'text-[#D93025]'
                 }`}
@@ -534,7 +539,13 @@ export default function Rides() {
               <View className="flex-row items-center mb-4">
                 {language === 'ar' ? (
                   <>
-                    <View className="flex-1">
+                    <View
+                      className="flex-1"
+                      style={{
+                        paddingLeft: (language as string) === 'ar' ? 60 : 0,
+                        paddingRight: (language as string) === 'ar' ? 0 : 60,
+                      }}
+                    >
                       <Text className="text-base font-CairoMedium text-right" numberOfLines={1}>
                         {item.origin_address}
                       </Text>
@@ -553,12 +564,18 @@ export default function Rides() {
                     <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
                       <Image source={icons.pin} className="w-5 h-5" resizeMode="contain" />
                     </View>
-                    <View className="flex-1">
+                    <View
+                      className="flex-1"
+                      style={{
+                        paddingLeft: (language as string) === 'ar' ? 60 : 0,
+                        paddingRight: (language as string) === 'ar' ? 0 : 60,
+                      }}
+                    >
                       <Text className="text-base font-JakartaMedium text-left" numberOfLines={1}>
                         {item.origin_address}
                       </Text>
                       {item.origin_street && (
-                        <Text className="text-sm text-gray-500 font-JakartaRegular mt-1 text-left" numberOfLines={1}>
+                        <Text className="text-sm text-gray-500 font-CairoRegular mt-1 text-left" numberOfLines={1}>
                           {item.origin_street}
                         </Text>
                       )}
@@ -569,43 +586,28 @@ export default function Rides() {
 
               {/* Add waypoints display */}
               {item.waypoints && item.waypoints.length > 0 && (
-                item.waypoints.map((waypoint, index) => (
-                  <View key={index} className="flex-row items-center mb-4">
-                    {language === 'ar' ? (
-                      <>
-                        <View className="flex-1">
-                          <Text className="text-base font-CairoMedium text-right" numberOfLines={1}>
-                            {`${t.stop} ${index + 1}: ${waypoint.address}`}
+                <View className="mt-2 mb-2">
+                  <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <Image source={icons.map} resizeMode="contain" tintColor="#F79824" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                      {language === 'ar' ? 'نقاط التوقف' : 'Waypoints'}:
+                    </Text>
+                    <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {item.waypoints.map((waypoint, index) => (
+                        <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                          <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium mt-2' : 'font-CairoMedium mt-2 ml-1'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                            {waypoint.address}
                           </Text>
-                          {waypoint.street && (
-                            <Text className="text-sm text-gray-500 font-CairoRegular mt-1 text-right" numberOfLines={1}>
-                              {waypoint.street}
-                            </Text>
+                          {index < item.waypoints!.length - 1 && (
+                            <View className={`mx-1 ${language === 'ar' ? 'transform rotate-180' : ''}`}>
+                              <MaterialIcons name="arrow-forward" size={18} color="#F79824" />
+                            </View>
                           )}
                         </View>
-                        <View className="w-8 h-8 rounded-full items-center justify-center ml-3">
-                          <Image source={icons.map} className="w-5 h-5" tintColor="#F79824" />
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        <View className="w-8 h-8 rounded-full items-center justify-center mr-3">
-                          <Image source={icons.map} className="w-5 h-5" tintColor="#F79824" />
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-base font-JakartaMedium text-left" numberOfLines={1}>
-                            {`${t.stop} ${index + 1}: ${waypoint.address}`}
-                          </Text>
-                          {waypoint.street && (
-                            <Text className="text-sm text-gray-500 font-JakartaRegular mt-1 text-left" numberOfLines={1}>
-                              {waypoint.street}
-                            </Text>
-                          )}
-                        </View>
-                      </>
-                    )}
+                      ))}
+                    </View>
                   </View>
-                ))
+                </View>
               )}
 
               <View className="flex-row items-center mb-4">
@@ -754,29 +756,106 @@ export default function Rides() {
     ({ section: { title } }: { section: { title: string } }) => (
       <View className="bg-gray-100 px-4 py-2">
         <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-900 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-          {title === 'الرحلات التي قمت بقيادتها' ? t.ridesYouDrove : t.ridesYouJoined}
+          {title === t.ridesYouDrove ? t.ridesYouDrove : t.ridesYouJoined}
         </Text>
       </View>
     ),
     [language, t]
   );
 
+  const renderPastRideTypeFilter = () => (
+    <View className="bg-white py-2 border-b border-gray-100">
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
+      >
+        <TouchableOpacity
+          onPress={() => setPastRideTypeFilter('all')}
+          className={`flex-row items-center px-4 py-2 rounded-full mr-3 ${
+            pastRideTypeFilter === 'all' ? 'bg-orange-500' : 'bg-gray-100'
+          }`}
+        >
+          <MaterialIcons 
+            name="history" 
+            size={16} 
+            color={pastRideTypeFilter === 'all' ? 'white' : '#374151'} 
+          />
+          <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} mr-1 ${
+            pastRideTypeFilter === 'all' ? 'text-white' : 'text-gray-700'
+          }`}>
+            {t.all}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setPastRideTypeFilter('drove')}
+          className={`flex-row items-center px-4 py-2 rounded-full mr-3 ${
+            pastRideTypeFilter === 'drove' ? 'bg-orange-500' : 'bg-gray-100'
+          }`}
+        >
+          <MaterialIcons 
+            name="person" 
+            size={16} 
+            color={pastRideTypeFilter === 'drove' ? 'white' : '#374151'} 
+          />
+          <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} mr-1 ${
+            pastRideTypeFilter === 'drove' ? 'text-white' : 'text-gray-700'
+          }`}>
+            {t.ridesYouDrove}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setPastRideTypeFilter('joined')}
+          className={`flex-row items-center px-4 py-2 rounded-full mr-3 ${
+            pastRideTypeFilter === 'joined' ? 'bg-orange-500' : 'bg-gray-100'
+          }`}
+        >
+          <MaterialIcons 
+            name="group" 
+            size={16} 
+            color={pastRideTypeFilter === 'joined' ? 'white' : '#374151'} 
+          />
+          <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} mr-1 ${
+            pastRideTypeFilter === 'joined' ? 'text-white' : 'text-gray-700'
+          }`}>
+            {t.ridesYouJoined}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+
   const pastRidesSections = useMemo(() => {
-    const sections = [];
-    if (pastDriverRides.length > 0) {
+    let sections = [];
+    
+    // Filter rides based on pastRideTypeFilter
+    let filteredDriverRides = pastDriverRides;
+    let filteredPassengerRides = pastPassengerRides;
+
+    if (pastRideTypeFilter === 'drove') {
+      filteredPassengerRides = [];
+    } else if (pastRideTypeFilter === 'joined') {
+      filteredDriverRides = [];
+    }
+
+    if (filteredDriverRides.length > 0) {
       sections.push({
         title: t.ridesYouDrove,
-        data: pastDriverRides,
+        data: filteredDriverRides,
       });
     }
-    if (pastPassengerRides.length > 0) {
+
+    if (filteredPassengerRides.length > 0) {
       sections.push({
         title: t.ridesYouJoined,
-        data: pastPassengerRides,
+        data: filteredPassengerRides,
       });
     }
+
     return sections;
-  }, [pastDriverRides, pastPassengerRides, t]);
+  }, [pastDriverRides, pastPassengerRides, pastRideTypeFilter, t]);
 
   const currentData = useMemo(() => {
     let filteredRides = activeTab === 'upcoming' ? upcomingRides : [];
@@ -913,23 +992,7 @@ export default function Rides() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setStatusFilter('pending')}
-          className={`flex-row items-center px-4 py-2 rounded-full mr-3 ${
-            statusFilter === 'pending' ? 'bg-orange-400' : 'bg-gray-100'
-          }`}
-        >
-          <MaterialIcons 
-            name="pending" 
-            size={16} 
-            color={statusFilter === 'pending' ? 'white' : '#374151'} 
-          />
-          <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} mr-1 ${
-            statusFilter === 'pending' ? 'text-white' : 'text-gray-700'
-          }`}>
-            {t.pending}
-          </Text>
-        </TouchableOpacity>
+       
 
         <TouchableOpacity
           onPress={() => setStatusFilter('completed')}
@@ -1050,11 +1113,13 @@ export default function Rides() {
         </TouchableOpacity>
       </View>
 
-      {activeTab === 'upcoming' && (
+      {activeTab === 'upcoming' ? (
         <>
           {renderRideTypeFilter()}
           {renderStatusFilter()}
         </>
+      ) : (
+        renderPastRideTypeFilter()
       )}
 
       {loading ? (
