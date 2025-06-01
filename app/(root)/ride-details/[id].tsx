@@ -2535,6 +2535,7 @@ const RideDetails = () => {
       destination={ride ? { latitude: ride.destination_latitude, longitude: ride.destination_longitude } : undefined}
       waypoints={ride?.waypoints}
       bottomSheetRef={bottomSheetRef}
+      language={language}
     >
       <ScrollView
         ref={scrollViewRef}
