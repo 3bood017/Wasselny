@@ -510,12 +510,21 @@ export default function Rides() {
             });
           }}
           className="mb-4 mx-4"
+          activeOpacity={0.7}
         >
           <LinearGradient
             colors={['#FFFFFF', '#F8F8F8']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            className="rounded-2xl shadow-sm overflow-hidden"
+            className="rounded-2xl overflow-hidden border-2 border-gray-100"
+            style={{
+              elevation: Platform.OS === "android" ? 6 : 0,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.15,
+              shadowRadius: 4.65,
+              transform: [{ scale: 1 }], // This will be animated on press
+            }}
           >
             <View
               className={`absolute top-4 ${language === 'ar' ? 'left-4' : 'right-4'} px-3 py-1 rounded-full ${
@@ -523,6 +532,15 @@ export default function Rides() {
                 item.status === 'completed' ? 'bg-[#E8F0FE]' :
                 'bg-[#FCE8E6]'
               }`}
+              style={{
+                elevation: Platform.OS === "android" ? 2 : 0,
+                shadowColor: item.status === 'available' ? "#1E8E3E" :
+                           item.status === 'completed' ? "#1A73E8" :
+                           "#D93025",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+              }}
             >
               <Text
                 className={`text-xs ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${
@@ -587,26 +605,54 @@ export default function Rides() {
               {/* Add waypoints display */}
               {item.waypoints && item.waypoints.length > 0 && (
                 <View className="mt-2 mb-2">
-                  <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                    <Image source={icons.map} resizeMode="contain" tintColor="#F79824" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
-                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
-                      {language === 'ar' ? 'نقاط التوقف' : 'Waypoints'}:
-                    </Text>
-                    <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                      {item.waypoints.map((waypoint, index) => (
-                        <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium mt-2' : 'font-CairoMedium mt-2 ml-1'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                            {waypoint.address}
-                          </Text>
-                          {index < item.waypoints!.length - 1 && (
-                            <View className={`mx-1 ${language === 'ar' ? 'transform rotate-180' : ''}`}>
-                              <MaterialIcons name="arrow-forward" size={18} color="#F79824" />
-                            </View>
-                          )}
-                        </View>
-                      ))}
+                  {/* Conditional rendering based on waypoint count */}
+                  {item.waypoints.length > 1 ? (
+                    // Case: More than one waypoint (label above the list)
+                    <View>
+                      <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} mb-2`}>
+                        <Image source={icons.map} resizeMode="contain" tintColor="#F79824" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                        <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'}`}>
+                          {language === 'ar' ? 'نقاط التوقف' : 'Waypoints'}:
+                        </Text>
+                      </View>
+                      <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center`}>
+                        {item.waypoints.map((waypoint, index) => (
+                          <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} ${index > 0 ? (language === 'ar' ? 'mr-1' : 'ml-1') : ''}`}>
+                            <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                              {waypoint.address}
+                            </Text>
+                            {index < item.waypoints!.length - 1 && (
+                              <View className={`mx-1 ${language === 'ar' ? 'transform rotate-180' : ''}`}>
+                                <MaterialIcons name="arrow-forward" size={18} color="#F79824" />
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
                     </View>
-                  </View>
+                  ) : (
+                    // Case: Exactly one waypoint (label on the same line)
+                    <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <Image source={icons.map} resizeMode="contain" tintColor="#F79824" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                      <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
+                        {language === 'ar' ? 'نقاط التوقف' : 'Waypoints'}:
+                      </Text>
+                      <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} items-center`}>
+                         {item.waypoints.map((waypoint, index) => (
+                          <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'} ${index > 0 ? (language === 'ar' ? 'mr-1' : 'ml-1') : ''}`}>
+                            <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                              {waypoint.address}
+                            </Text>
+                            {index < item.waypoints!.length - 1 && (
+                              <View className={`mx-1 ${language === 'ar' ? 'transform rotate-180' : ''}`}>
+                                <MaterialIcons name="arrow-forward" size={18} color="#F79824" />
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
 
