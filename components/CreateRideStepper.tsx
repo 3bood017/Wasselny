@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Animated,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
 } from "react-native";
 import StepIndicator from "react-native-step-indicator";
 import GoogleTextInput from "@/components/GoogleTextInput";
@@ -43,7 +44,6 @@ interface Location {
 
 interface Waypoint {
   address: string;
-  street: string;
   latitude: number;
   longitude: number;
 }
@@ -59,7 +59,6 @@ interface RideRequestData {
   origin_street: string;
   waypoints: {
     address: string;
-    street: string;
     latitude: number;
     longitude: number;
   }[];
@@ -110,6 +109,149 @@ const stepIndicatorStyles = {
   labelSize: 16,
   currentStepLabelColor: "#f97316",
   labelAlign: "center",
+};
+
+interface CustomAlertProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  type?: 'success' | 'error' | 'warning' | 'info';
+}
+
+const screenHeight = Dimensions.get('screen').height;
+
+const CustomAlert = ({ 
+  visible, 
+  title, 
+  message, 
+  onConfirm, 
+  onCancel, 
+  confirmText = 'نعم', 
+  cancelText = 'لا',
+  type = 'info'
+}: CustomAlertProps) => {
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 7
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true
+        })
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 7
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true
+        })
+      ]).start();
+    }
+  }, [visible]);
+
+  const getTypeStyles = () => {
+    switch (type) {
+      case 'success':
+        return {
+          icon: 'check-circle' as IconName,
+          color: '#22c55e',
+          bgColor: '#dcfce7'
+        };
+      case 'error':
+        return {
+          icon: 'error' as IconName,
+          color: '#ef4444',
+          bgColor: '#fee2e2'
+        };
+      case 'warning':
+        return {
+          icon: 'warning' as IconName,
+          color: '#f97316',
+          bgColor: '#ffedd5'
+        };
+      default:
+        return {
+          icon: 'info' as IconName,
+          color: '#3b82f6',
+          bgColor: '#dbeafe'
+        };
+    }
+  };
+
+  const typeStyles = getTypeStyles();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onCancel}
+    >
+      <View className="flex-1 justify-center items-center bg-black/50">
+        <Animated.View 
+          className="w-[85%] bg-white rounded-2xl overflow-hidden"
+          style={{
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim
+          }}
+        >
+          <View className={`p-6 ${typeStyles.bgColor}`}>
+            <View className="items-center mb-4">
+              <MaterialIcons name={typeStyles.icon} size={48} color={typeStyles.color} />
+            </View>
+            <Text className="text-xl font-CairoBold text-gray-800 text-center mb-2">
+              {title}
+            </Text>
+            <Text className="text-base text-gray-600 text-center font-CairoRegular">
+              {message}
+            </Text>
+          </View>
+          
+          <View className="flex-row border-t border-gray-200">
+            {onCancel && (
+              <TouchableOpacity
+                onPress={onCancel}
+                className="flex-1 py-4 border-r border-gray-200"
+              >
+                <Text className="text-base text-gray-600 text-center font-CairoMedium">
+                  {cancelText}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={onConfirm}
+              className={`py-4 ${onCancel ? 'flex-1' : 'w-full'}`}
+              style={{ backgroundColor: typeStyles.color }}
+            >
+              <Text className="text-base text-white text-center font-CairoMedium">
+                {confirmText}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
 };
 
 const RideCreationScreen = () => {
@@ -220,6 +362,22 @@ const RideCreationScreen = () => {
   const [collapsedWaypoints, setCollapsedWaypoints] = useState<number[]>([]);
   const [startStreet, setStartStreet] = useState("");
   const [destinationStreet, setDestinationStreet] = useState("");
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    onConfirm: () => void;
+    onCancel?: () => void;
+    confirmText?: string;
+    cancelText?: string;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: () => {},
+  });
 
   // Animation states
   const [nextButtonScale] = useState(new Animated.Value(1));
@@ -285,7 +443,6 @@ const RideCreationScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setWaypoints(prev => [...prev, {
       address: location.address,
-      street: "",
       latitude: location.latitude,
       longitude: location.longitude
     }]);
@@ -507,123 +664,120 @@ const strokeDashoffset = circumference - progress * circumference;
     }
   }, [selectedDateRange, t]);
 
+  const showAlert = (config: typeof alertConfig) => {
+    setAlertConfig({
+      ...config,
+      confirmText: config.confirmText || (language === 'ar' ? 'حسناً' : 'OK'),
+      cancelText: config.cancelText || (language === 'ar' ? 'إلغاء' : 'Cancel')
+    });
+  };
+
   const validateForm = useCallback(() => {
     if (currentStep === 0) {
       if (!userAddress || !destinationAddress) {
-        Alert.alert(t.error, t.locationError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يرجى إدخال نقطة البداية والوجهة" : "Please enter starting point and destination",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
     } else if (currentStep === 1) {
       // Validate day selection
       if (!selectedDay) {
-        Alert.alert(t.error, t.dayError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يرجى اختيار يوم الرحلة" : "Please select a trip day",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       // Validate date
       if (!isRecurring && !tripDate) {
-        Alert.alert(t.error, t.dateError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يرجى اختيار تاريخ الرحلة" : "Please select a trip date",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       // Validate time
       if (!tripTime) {
-        Alert.alert(t.error, t.timeError);
-        return false;
-      }
-
-      // Validate date format
-      const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-      if (!dateRegex.test(tripDate)) {
-        Alert.alert(t.error, t.dateFormatError);
-        return false;
-      }
-
-      // Validate time format
-      const timeRegex = /^\d{2}:\d{2}$/;
-      if (!timeRegex.test(tripTime)) {
-        Alert.alert(t.error, t.timeFormatError);
-        return false;
-      }
-
-      // Parse and validate date and time
-      try {
-        const [day, month, year] = tripDate.split("/").map(Number);
-        const [hours, minutes] = tripTime.split(":").map(Number);
-        
-        // Validate date components
-        if (isNaN(day) || isNaN(month) || isNaN(year) || 
-            day < 1 || day > 31 || month < 1 || month > 12) {
-          Alert.alert(t.error, t.invalidDateError);
-          return false;
-        }
-
-        // Validate time components
-        if (isNaN(hours) || isNaN(minutes) || 
-            hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-          Alert.alert(t.error, t.invalidTimeError);
-          return false;
-        }
-
-        const selectedDateTime = new Date(year, month - 1, day, hours, minutes);
-        
-        // Check if date is valid
-        if (isNaN(selectedDateTime.getTime())) {
-          Alert.alert(t.error, t.invalidDateTimeError);
-          return false;
-        }
-
-        // Check if date is in the future
-        const now = new Date();
-        if (selectedDateTime <= now) {
-          Alert.alert(t.error, t.futureDateTimeError);
-          return false;
-        }
-
-        // Check if time is at least 1 hour from now for same day
-        const isSameDay = 
-          selectedDateTime.getDate() === now.getDate() &&
-          selectedDateTime.getMonth() === now.getMonth() &&
-          selectedDateTime.getFullYear() === now.getFullYear();
-
-        if (isSameDay) {
-          const oneHourFromNow = new Date(now.getTime() + 29 * 60 * 1000);
-          if (selectedDateTime <= oneHourFromNow) {
-            Alert.alert(t.error, t.minimumTimeError);
-            return false;
-          }
-        }
-      } catch (error) {
-        console.error("Date validation error:", error);
-        Alert.alert(t.error, t.invalidDateTimeError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يرجى اختيار وقت الرحلة" : "Please select a trip time",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       // Validate seats
       if (!carInfo) {
-        Alert.alert(t.error, t.carInfoError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "لم يتم العثور على معلومات السيارة" : "Car information not found",
+          type: 'error',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       if (!availableSeats || isNaN(parseInt(availableSeats))) {
-        Alert.alert(t.error, t.seatsRequiredError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يرجى إدخال عدد المقاعد" : "Please enter number of seats",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       const seatsNumber = parseInt(availableSeats);
       if (seatsNumber < 1) {
-        Alert.alert(t.error, t.minSeatsError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يجب أن يكون عدد المقاعد 1 على الأقل" : "Number of seats must be at least 1",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       if (seatsNumber > (carInfo?.seats || 25)) {
-        Alert.alert(t.error, t.maxSeatsError(carInfo?.seats || 25));
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' 
+            ? `لا يمكن تجاوز عدد مقاعد سيارتك (${carInfo?.seats || 25} مقعد)`
+            : `Cannot exceed your car's seat capacity (${carInfo?.seats || 25} seats)`,
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
 
       // Validate gender
       if (!selectedGender) {
-        Alert.alert(t.error, t.genderError);
+        showAlert({
+          visible: true,
+          title: language === 'ar' ? "تنبيه" : "Alert",
+          message: language === 'ar' ? "يرجى اختيار الجنس المطلوب" : "Please select required gender",
+          type: 'warning',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
         return false;
       }
     }
@@ -639,7 +793,7 @@ const strokeDashoffset = circumference - progress * circumference;
     selectedGender,
     isRecurring,
     carInfo,
-    t
+    language
   ]);
 
   const resetForm = useCallback(() => {
@@ -788,7 +942,6 @@ const strokeDashoffset = circumference - progress * circumference;
         }
         return {
           address: waypoint.address,
-          street: waypoint.street || "", // Make street optional
           latitude: waypoint.latitude,
           longitude: waypoint.longitude
         };
@@ -801,8 +954,8 @@ const strokeDashoffset = circumference - progress * circumference;
         origin_longitude: userLongitude,
         destination_latitude: destinationLatitude,
         destination_longitude: destinationLongitude,
-        destination_street: destinationStreet || "", // Make street optional
-        origin_street: startStreet || "", // Make street optional
+        destination_street: destinationStreet || "",
+        origin_street: startStreet || "",
         waypoints: validatedWaypoints,
         ride_datetime: rideDateTimeStr,
         ride_days: [selectedDay],
@@ -874,7 +1027,11 @@ const strokeDashoffset = circumference - progress * circumference;
 
   const handleAddWaypointPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsAddingWaypoint(true);
+    setWaypoints(prev => [...prev, {
+      address: "",
+      latitude: 0,
+      longitude: 0
+    }]);
   }, []);
 
   const handleToggleWaypointCollapse = useCallback((index: number) => {
@@ -1462,38 +1619,46 @@ const strokeDashoffset = circumference - progress * circumference;
               </Text>
             </View>
             <View
-              className="shadow-sm mb-3"
-              style={{
-                elevation: Platform.OS === "android" ? 8 : 0,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                overflow: "visible",
-              }}
+             className="mb-3 bg-white rounded-xl border border-gray-100 shadow-sm"
+             style={{
+               elevation: Platform.OS === "android" ? 6 : 0,
+               shadowColor: "#000",
+               shadowOffset: { width: 0, height: 2 },
+               shadowOpacity: 0.15,
+               shadowRadius: 3,
+               overflow: "visible",
+             }}
             >
               <GoogleTextInput
-                icon={icons.target}
+                icon={icons.pin}
                 initialLocation={userAddress || ""}
-                containerStyle="bg-white rounded-xl border-2 shadow-lg border-gray-100"
+                containerStyle="bg-white rounded-xl"
                 textInputBackgroundColor="#fff"
                 handlePress={handleFromLocation}
-                placeholder={language === 'ar' ? "أدخل موقع البداية" : "Enter starting point"}
+                placeholder={language === 'ar' ? "أدخل نقطة البداية" : "Enter starting point"}
               />
             </View>
             <View className="mt-2">
               <Text className={`text-base font-CairoBold mb-2 ${isRTL ? 'text-right' : 'text-left'} text-gray-800`}>
-                {language === 'ar' ? "الشارع" : "Street"}
+                {language === 'ar' ? "شارع البداية" : "Starting Street"}
               </Text>
               <View
-                className="flex-row items-center rounded-xl p-3 bg-white border-2 border-gray-100 shadow-sm"
+               className="flex-row items-center rounded-xl p-3 bg-white border border-gray-100 shadow-sm"
+               style={{
+                 elevation: Platform.OS === "android" ? 6 : 0,
+                 shadowColor: "#000",
+                 shadowOffset: { width: 0, height: 2 },
+                 shadowOpacity: 0.15,
+                 shadowRadius: 3,
+                 overflow: "visible",
+               }}
               >
                 <Image source={icons.street} className={`w-7 h-7 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                 <TextInput
                   value={startStreet}
                   onChangeText={setStartStreet}
-                  placeholder={language === 'ar' ? "أدخل اسم الشارع" : "Enter street name"}
-                  className={`flex-1 ${isRTL ? 'text-right mr-1 ml-2.5' : 'text-left ml-1 mr-2.5'} bg-transparent pt-1 pb-2 font-CairoBold placeholder:font-CairoBold`}
+                  placeholder={language === 'ar' ? "الشارع الذي ستبدأ منه رحلتك" : "The street you start your trip from"}
+                  className={`flex-1 ${isRTL ? 'text-right mr-1 ml-2.5' : 'text-left ml-1 mr-2.5'} bg-transparent pt-1 pb-1 font-CairoBold placeholder:font-CairoBold`}
                   placeholderTextColor="#9CA3AF"
                   autoCorrect={false}
                   autoCapitalize="none"
@@ -1504,102 +1669,83 @@ const strokeDashoffset = circumference - progress * circumference;
           </View>
         );
       case 'waypoint':
-        const isCollapsed = collapsedWaypoints.includes(item.index!);
+        const waypointNumber = item.index! + 1;
         return (
           <View className="my-4">
             <View className="flex-row justify-between items-center mb-3">
-              <View className="flex-row items-center">
-                <TouchableOpacity
-                  onPress={() => handleRemoveWaypoint(item.index!)}
-                  className="p-2 bg-red-50 rounded-lg mr-2"
-                  activeOpacity={0.7}
-                >
-                  <Image 
-                    source={icons.close} 
-                    className="w-5 h-5 tint-red-500"
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleToggleWaypointCollapse(item.index!)}
-                  className="p-2 bg-gray-50 rounded-lg"
-                  activeOpacity={0.7}
-                >
-                  <Image 
-                    source={icons.arrowDown} 
-                    className={`w-5 h-5 tint-gray-500 ${isCollapsed ? 'rotate-180' : ''}`}
-                    style={{ transform: [{ rotate: isCollapsed ? '180deg' : '0deg' }] }}
-                  />
-                </TouchableOpacity>
-              </View>
-              <View className={`flex-row items-center ${isRTL ? 'justify-end' : 'justify-start'}`}>
-                <View className={`w-8 h-8 bg-orange-100 rounded-full justify-center items-center ${isRTL ? 'ml-2' : 'mr-2'}`}>
-                  <Text className="text-orange-500 font-CairoBold">{item.index! + 1}</Text>
-                </View>
-                <Text className={`text-lg font-CairoBold ${isRTL ? 'text-right' : 'text-left'} text-gray-800`}>
-                  {language === 'ar' ? "نقطة مرور" : "Waypoint"}
-                </Text>
-              </View>
-            </View>
-            {!isCollapsed && (
-              <Animated.View>
-                <View
-                  className="shadow-sm mb-3"
-                 
-                >
-                  <GoogleTextInput
-                    icon={icons.map}
-                    initialLocation={item.waypoint?.address || ""}
-                    containerStyle="bg-white rounded-xl border-2 shadow-lg border-gray-100"
-                    textInputBackgroundColor="#fff"
-                    handlePress={(location) => {
-                      if (item.waypoint) {
-                        const updatedWaypoint: Waypoint = {
-                          ...item.waypoint,
-                          address: location.address,
-                          latitude: location.latitude,
-                          longitude: location.longitude
-                        };
-                        setWaypoints(prev => prev.map((wp, i) => 
-                          i === item.index ? updatedWaypoint : wp
-                        ));
-                      }
-                    }}
-                    placeholder={language === 'ar' ? "أدخل نقطة المرور" : "Enter waypoint"}
-                  />
-                </View>
-                <View className="mt-2">
-                  <Text className={`text-base font-CairoBold mb-2 ${isRTL ? 'text-right' : 'text-left'} text-gray-800`}>
-                    {language === 'ar' ? "الشارع" : "Street"}
-                  </Text>
-                  <View
-                    className="flex-row items-center rounded-xl p-3 bg-white border-2 border-gray-100 shadow-sm"
-                    
-                  >
-                    <Image source={icons.street} className={`w-7 h-7 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-                    <TextInput
-                      value={item.waypoint?.street}
-                      onChangeText={(text) => {
-                        if (item.waypoint) {
-                          const updatedWaypoint: Waypoint = {
-                            ...item.waypoint,
-                            street: text
-                          };
-                          setWaypoints(prev => prev.map((wp, i) => 
-                            i === item.index ? updatedWaypoint : wp
-                          ));
-                        }
-                      }}
-                      placeholder={language === 'ar' ? "أدخل اسم الشارع" : "Enter street name"}
-                      className={`flex-1  ${isRTL ? 'text-right mr-1 ml-2.5' : 'text-left ml-1 mr-2.5'} bg-transparent pt-1 pb-2 font-CairoBold placeholder:font-CairoBold`}
-                      placeholderTextColor="#9CA3AF"
-                      autoCorrect={false}
-                      autoCapitalize="none"
-                      textAlign={isRTL ? 'right' : 'left'}
-                    />
+              {isRTL ? (
+                // Arabic layout (X on right, number on left)
+                <>
+                  <View className="flex-row items-center">
+                    <TouchableOpacity
+                      onPress={() => handleRemoveWaypoint(item.index!)}
+                      className="p-2 bg-red-50 rounded-lg mr-2"
+                      activeOpacity={0.7}
+                    >
+                      <Image 
+                        source={icons.close} 
+                        className="w-5 h-5 tint-red-500"
+                      />
+                    </TouchableOpacity>
                   </View>
-                </View>
-              </Animated.View>
-            )}
+                  <View className="flex-row items-center justify-end">
+                    <Text className="text-lg font-CairoBold text-right text-gray-800 ml-2">
+                      {`نقطة مرور ${waypointNumber}`}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                // English layout (number on left, X on right)
+                <>
+                  <View className="flex-row items-center">
+                    <Text className="text-lg font-CairoBold text-left text-gray-800 mr-2">
+                      {`Waypoint ${waypointNumber}`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveWaypoint(item.index!)}
+                    className="p-2 bg-red-50 rounded-lg"
+                    activeOpacity={0.7}
+                  >
+                    <Image 
+                      source={icons.close} 
+                      className="w-5 h-5 tint-red-500"
+                    />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+            <View
+              className="mb-3 bg-white rounded-xl border border-gray-100 shadow-sm"
+              style={{
+                elevation: Platform.OS === "android" ? 6 : 0,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 3,
+                overflow: "visible",
+              }}
+            >
+              <GoogleTextInput
+                icon={icons.target}  // Changed from map to target for waypoints
+                initialLocation={item.waypoint?.address || ""}
+                containerStyle="bg-white rounded-xl"
+                textInputBackgroundColor="#fff"
+                handlePress={(location) => {
+                  if (item.waypoint) {
+                    const updatedWaypoint: Waypoint = {
+                      address: location.address,
+                      latitude: location.latitude,
+                      longitude: location.longitude
+                    };
+                    setWaypoints(prev => prev.map((wp, i) => 
+                      i === item.index ? updatedWaypoint : wp
+                    ));
+                  }
+                }}
+                placeholder={language === 'ar' ? `أدخل نقطة مرور ${waypointNumber}` : `Enter waypoint ${waypointNumber}`}
+              />
+            </View>
           </View>
         );
       case 'addButton':
@@ -1608,7 +1754,6 @@ const strokeDashoffset = circumference - progress * circumference;
             onPress={handleAddWaypointPress}
             className="flex-row items-center justify-center bg-orange-50 p-4 rounded-xl mt-4 mb-6 border-2 border-orange-100"
             activeOpacity={0.7}
-           
           >
             <View className={`w-8 h-8 bg-orange-100 rounded-full justify-center items-center ${isRTL ? 'ml-4' : 'mr-4'}`}>
               <Image source={icons.add} className="w-4 h-4 tint-orange-500" />
@@ -1622,19 +1767,25 @@ const strokeDashoffset = circumference - progress * circumference;
         return (
           <View className="my-4">
             <View className={`flex-row items-center mb-3 ${isRTL ? 'justify-end' : 'justify-start'}`}>
-              
               <Text className={`text-lg font-CairoBold ${isRTL ? 'text-right' : 'text-left'} text-gray-800`}>
                 {language === 'ar' ? "الوجهة" : "Destination"}
               </Text>
             </View>
             <View
-              className="shadow-sm mb-3"
-              
+             className="mb-3 bg-white rounded-xl border border-gray-100 shadow-sm"
+             style={{
+               elevation: Platform.OS === "android" ? 6 : 0,
+               shadowColor: "#000",
+               shadowOffset: { width: 0, height: 2 },
+               shadowOpacity: 0.15,
+               shadowRadius: 3,
+               overflow: "visible",
+             }}
             >
               <GoogleTextInput
-                icon={icons.map}
+                icon={icons.target}  // Changed from map to target for destination
                 initialLocation={destinationAddress || ""}
-                containerStyle="bg-white rounded-xl border-2 shadow-lg border-gray-100"
+                containerStyle="bg-white rounded-xl"
                 textInputBackgroundColor="#fff"
                 handlePress={handleToLocation}
                 placeholder={language === 'ar' ? "أدخل الوجهة" : "Enter destination"}
@@ -1642,18 +1793,25 @@ const strokeDashoffset = circumference - progress * circumference;
             </View>
             <View className="mt-2">
               <Text className={`text-base font-CairoBold mb-2 ${isRTL ? 'text-right' : 'text-left'} text-gray-800`}>
-                {language === 'ar' ? "الشارع" : "Street"}
+                {language === 'ar' ? "شارع الوجهة" : "Destination Street"}
               </Text>
               <View
-                className="flex-row items-center rounded-xl p-3 bg-white border-2 border-gray-100 shadow-sm"
-                
+               className="flex-row items-center rounded-xl p-3 bg-white border border-gray-100 shadow-sm"
+               style={{
+                 elevation: Platform.OS === "android" ? 6 : 0,
+                 shadowColor: "#000",
+                 shadowOffset: { width: 0, height: 2 },
+                 shadowOpacity: 0.15,
+                 shadowRadius: 3,
+                 overflow: "visible",
+               }}
               >
                 <Image source={icons.street} className={`w-7 h-7 ${isRTL ? 'ml-2' : 'mr-2'}`} />
                 <TextInput
                   value={destinationStreet}
                   onChangeText={setDestinationStreet}
-                  placeholder={language === 'ar' ? "أدخل اسم الشارع" : "Enter street name"}
-                  className={`flex-1  ${isRTL ? 'text-right mr-1 ml-2.5' : 'text-left ml-1 mr-2.5'} bg-transparent pt-1 pb-2 font-CairoBold placeholder:font-CairoBold`}
+                  placeholder={language === 'ar' ? "الشارع الذي ستنهي رحلتك فيه" : "The street you will end your trip in"}
+                  className={`flex-1 ${isRTL ? 'text-right mr-1 ml-2.5' : 'text-left ml-1 mr-2.5'} bg-transparent pt-1 pb-1 font-CairoBold placeholder:font-CairoBold`}
                   placeholderTextColor="#9CA3AF"
                   autoCorrect={false}
                   autoCapitalize="none"
@@ -1666,48 +1824,6 @@ const strokeDashoffset = circumference - progress * circumference;
       default:
         return null;
     }
-  };
-
-  const WaypointLocationPicker = ({ onLocationSelect }: { onLocationSelect: (location: Location) => void }) => {
-    const router = useRouter();
-    const { language } = useLanguage();
-
-    return (
-      <View className="flex-1 bg-white">
-        <View className="p-4 border-b border-gray-200">
-          <Text className={`text-lg font-CairoBold ${isRTL ? 'text-right mr-7' : 'text-left ml-7'} text-gray-800`}>
-            {language === 'ar' ? "اختر نقطة المرور" : "Choose Waypoint"}
-          </Text>
-        </View>
-        <View className="p-4">
-          <Text className={`text-sm font-CairoRegular ${isRTL ? 'text-right' : 'text-left'} text-gray-500 mb-4`}>
-            {language === 'ar' 
-              ? "اختر موقع نقطة المرور من الخريطة أو ابحث عن العنوان"
-              : "Choose a waypoint location from the map or search for an address"}
-          </Text>
-          <View 
-            className="shadow-sm"
-            style={{
-              elevation: Platform.OS === "android" ? 8 : 0,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              overflow: "visible",
-            }}
-          >
-            <GoogleTextInput
-              icon={icons.map}
-              initialLocation=""
-              containerStyle="bg-white rounded-xl border border-gray-100"
-              textInputBackgroundColor="#fff"
-              handlePress={onLocationSelect}
-              placeholder={language === 'ar' ? "ابحث عن موقع" : "Search for a location"}
-            />
-          </View>
-        </View>
-      </View>
-    );
   };
 
   useEffect(() => {
@@ -1746,6 +1862,9 @@ const strokeDashoffset = circumference - progress * circumference;
         showProfileImage={false}
       />
       
+      {/* Custom Alert */}
+      <CustomAlert {...alertConfig} />
+
       <View className="px-4 py-4">
       <View className="flex-row items-center">
         <View className="w-16 h-16 mr-3 relative justify-center items-center">
@@ -1878,6 +1997,12 @@ const strokeDashoffset = circumference - progress * circumference;
         animationIn="fadeIn"
         animationOut="fadeOut"
         backdropOpacity={0.5}
+        deviceHeight={screenHeight}
+        coverScreen={true}
+  useNativeDriver={true}
+  propagateSwipe={true}
+        
+        
       >
         <View className="bg-white rounded-2xl p-6 items-center">
           <Image source={images.check} className="w-16 h-16 mb-4" />
@@ -1900,26 +2025,6 @@ const strokeDashoffset = circumference - progress * circumference;
             </Text>
           </TouchableOpacity>
         </View>
-      </ReactNativeModal>
-
-      {/* Waypoint Modal */}
-      <ReactNativeModal
-        isVisible={isAddingWaypoint}
-        style={{ margin: 0 }}
-        backdropOpacity={0.5}
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
-      >
-        <WaypointLocationPicker
-          onLocationSelect={handleAddWaypoint}
-        />
-
-        <TouchableOpacity 
-          className={`absolute top-4 ${isRTL ? 'left-4' : 'right-4'} bg-white rounded-full p-2`}
-          onPress={() => setIsAddingWaypoint(false)}
-        >
-          <Image source={icons.close} className="w-6 h-6" />
-        </TouchableOpacity>
       </ReactNativeModal>
     </SafeAreaView>
   );

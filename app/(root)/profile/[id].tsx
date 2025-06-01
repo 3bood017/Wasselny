@@ -207,13 +207,13 @@ export default function Profile() {
         if (userData.driver) {
           console.log('Fetching ratings for driver:', id);
           try {
-            const ratingsQuery = query(
-              collection(db, 'ratings'),
+          const ratingsQuery = query(
+            collection(db, 'ratings'),
               where('driver_id', '==', id),
               orderBy('created_at', 'desc')
-            );
-            
-            const ratingsSnapshot = await getDocs(ratingsQuery);
+          );
+          
+          const ratingsSnapshot = await getDocs(ratingsQuery);
             console.log('Ratings query snapshot:', ratingsSnapshot.empty ? 'No ratings found' : 'Ratings found');
             
             const ratingsData = ratingsSnapshot.docs.map(doc => {
@@ -238,20 +238,20 @@ export default function Profile() {
             });
             
             console.log('Processed ratings data:', ratingsData);
-            setRatings(ratingsData);
+          setRatings(ratingsData);
 
-            // Calculate average rating
-            if (ratingsData.length > 0) {
-              const avgRating = ratingsData.reduce((acc, curr) => acc + curr.overall, 0) / ratingsData.length;
+          // Calculate average rating
+          if (ratingsData.length > 0) {
+            const avgRating = ratingsData.reduce((acc, curr) => acc + curr.overall, 0) / ratingsData.length;
               console.log('Calculated average rating:', avgRating);
               setUser(prev => ({
                 ...prev!,
-                driver: {
+              driver: {
                   ...prev!.driver!,
-                  rating: avgRating,
-                  total_rides: ratingsData.length
-                }
-              }));
+                rating: avgRating,
+                total_rides: ratingsData.length
+              }
+            }));
             }
           } catch (error) {
             console.error('Error fetching ratings:', error);
@@ -262,26 +262,26 @@ export default function Profile() {
         if (userData.driver) {
           console.log('Fetching rides for driver:', id);
           try {
-            const ridesQuery = query(
-              collection(db, 'rides'),
-              where('driver_id', '==', id),
+          const ridesQuery = query(
+            collection(db, 'rides'),
+            where('driver_id', '==', id),
               where('status', 'in', ['available', 'completed', 'active', 'full', 'in-progress'])
-            );
-            
-            const ridesSnapshot = await getDocs(ridesQuery);
+          );
+          
+          const ridesSnapshot = await getDocs(ridesQuery);
             console.log('Rides query snapshot:', ridesSnapshot.empty ? 'No rides found' : 'Rides found');
             
             const ridesData = ridesSnapshot.docs.map(doc => {
               const data = doc.data();
               console.log('Ride document data:', data);
               return {
-                id: doc.id,
+            id: doc.id,
                 ...data
               } as Ride;
             });
-            
+          
             console.log('Processed rides data:', ridesData);
-            setRides(ridesData);
+          setRides(ridesData);
           } catch (error) {
             console.error('Error fetching rides:', error);
           }
@@ -320,7 +320,7 @@ export default function Profile() {
 
     return (
       <View className="bg-white py-2 px-1 rounded-2xl shadow-md mb-6">
-        <TouchableOpacity
+        <TouchableOpacity 
           onPress={() => setShowRatings(!showRatings)}
           className={`${flexDirection} justify-between items-center mb-2 bg-orange-50 p-4 rounded-xl`}
           activeOpacity={0.8}
@@ -338,7 +338,7 @@ export default function Profile() {
           <View className="bg-white px-4 py-2 items-center justify-center rounded-full shadow-sm">
             <Text className={`text-base ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-orange-500`}>
               {ratings.length}
-            </Text>
+          </Text>
           </View>
         </TouchableOpacity>
 
@@ -365,11 +365,11 @@ export default function Profile() {
                         {rating.overall?.toFixed(1) || '0.0'}
                       </Text>
                       {renderStars(rating.overall, 16)}
-                    </View>
                   </View>
+                </View>
 
                   {/* Category Ratings */}
-                  <View className="space-y-2">
+                <View className="space-y-2">
                     {[
                       { label: language === 'ar' ? 'قيادة السيارة' : 'Driving', value: rating.driving },
                       { label: language === 'ar' ? 'الأخلاق والسلوك' : 'Behavior', value: rating.behavior },
@@ -385,24 +385,24 @@ export default function Profile() {
                             {cat.value?.toFixed(1) || '0.0'}
                           </Text>
                           {renderStars(cat.value, 12)}
-                        </View>
-                      </View>
-                    ))}
                   </View>
+                  </View>
+                    ))}
+                </View>
 
                   {/* Comment */}
-                  {rating.comment && (
+                {rating.comment && (
                     <View className="mt-3 bg-white p-3 rounded-lg">
                       <Text className={`text-sm text-gray-700 ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'}`}>
-                        {rating.comment}
-                      </Text>
-                    </View>
-                  )}
+                      {rating.comment}
+                    </Text>
+                  </View>
+                )}
 
                   {/* Date */}
                   <Text className={`text-xs text-gray-400 mt-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {formatDistanceToNow(new Date(rating.created_at?.toDate?.() || rating.created_at), { addSuffix: true, locale: language === 'ar' ? ar : enUS })}
-                  </Text>
+                </Text>
                 </View>
               </View>
             ))}
@@ -426,9 +426,9 @@ export default function Profile() {
   };
 
   const handleCreateChat = async () => {
-    if (!currentUser) return;
-    setMessageLoading(true);
-    try {
+                if (!currentUser) return;
+                setMessageLoading(true);
+                try {
       const currentUserData = {
         id: currentUser.id,
         fullName: currentUser.fullName || 'User',
@@ -454,17 +454,17 @@ export default function Profile() {
       };
 
       const chatId = await findOrCreateChat(currentUserData, targetUserData);
-      if (chatId) {
-        router.push({
-          pathname: '/(root)/chat/[id]',
+                  if (chatId) {
+                    router.push({
+                      pathname: '/(root)/chat/[id]',
           params: { id: chatId, name: user.name, avatar: user.profile_image_url }
-        });
-      }
-    } catch (err) {
-      console.error('Error creating chat:', err);
-    } finally {
-      setMessageLoading(false);
-    }
+                    });
+                  }
+                } catch (err) {
+                  console.error('Error creating chat:', err);
+                } finally {
+                  setMessageLoading(false);
+                }
   };
 
   const ImagePreviewModal = () => (
@@ -523,8 +523,8 @@ export default function Profile() {
               resizeMode="cover"
             />
           </TouchableOpacity>
-        )}
-      </View>
+                )}
+              </View>
 
       {/* Profile Content */}
       <View className={`px-4 -mt-16`}>
@@ -538,7 +538,7 @@ export default function Profile() {
               source={{ uri: user.profile_image_url }}
               className="h-28 w-28 rounded-full bg-gray-200 border-4 border-white"
             />
-          </TouchableOpacity>
+            </TouchableOpacity>
         </View>
 
         {/* User Info */}
@@ -595,15 +595,15 @@ export default function Profile() {
               >
                 <View className="w-8 h-8 bg-purple-100 rounded-full items-center justify-center">
                   <MaterialIcons name="email" size={16} color="#A855F7" />
-                </View>
+          </View>
                 <View className={`flex-1 ${language === 'ar' ? 'mr-2' : 'ml-2'}`}>
                   <Text className={`text-xs ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'} text-gray-500`}>
                     {t.email}
-                  </Text>
+              </Text>
                   <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'} text-gray-900`}>
                     {user.email}
-                  </Text>
-                </View>
+              </Text>
+            </View>
                 <MaterialIcons 
                   name={language === 'ar' ? "chevron-left" : "chevron-right"} 
                   size={20} 
@@ -660,9 +660,9 @@ export default function Profile() {
                     {t.NumberOfSeats}
                   </Text>
                 </View>
-              </View>
             </View>
-          )}
+          </View>
+        )}
 
           {/* Driver Stats */}
           {user.driver && (
@@ -679,15 +679,15 @@ export default function Profile() {
                 <View className={`${flexDirection} items-center`}>
                   <Text className={`text-xl font-CairoBold text-gray-900 ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
                     {user.driver.rating?.toFixed(1) || '0.0'}
-                  </Text>
+                </Text>
                   <Image source={icons.star} style={{ width: 16, height: 16 }} />
                 </View>
                 <Text className={`text-xs ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'} text-gray-500`}>
                   {t.Rating}
                 </Text>
-              </View>
             </View>
-          )}
+          </View>
+        )}
 
 
           {/* Ratings */}
@@ -703,16 +703,16 @@ export default function Profile() {
                 <View className="bg-blue-50 px-3 py-1 rounded-full">
                   <Text className={`text-sm ${language === 'ar' ? 'font-CairoBold text-right' : 'font-JakartaBold text-left'} text-blue-500`}>
                     {rides.length}
-                  </Text>
+            </Text>
                 </View>
               </View>
               <View className="space-y-3">
-                {rides.map((ride) => (
-                  <TouchableOpacity
-                    key={ride.id}
-                    onPress={() => router.push(`/ride-details/${ride.id}`)}
-                    className="bg-gray-50 p-4 rounded-xl"
-                  >
+              {rides.map((ride) => (
+                <TouchableOpacity
+                  key={ride.id}
+                  onPress={() => router.push(`/ride-details/${ride.id}`)}
+                  className="bg-gray-50 p-4 rounded-xl"
+                >
                     {/* Status and Seats */}
                     <View className={`${flexDirection} justify-between items-center mb-3`}>
                       <View className={`${flexDirection} items-center bg-white px-3 py-1 rounded-full`}>
@@ -728,12 +728,12 @@ export default function Profile() {
                            ride.status === 'in-progress' ? (language === 'ar' ? 'قيد التنفيذ' : 'In Progress') :
                            ride.status === 'full' ? (language === 'ar' ? 'ممتلئ' : 'Full') :
                            ride.status}
-                        </Text>
+                    </Text>
                       </View>
                       <View className={`${flexDirection} items-center bg-white px-3 py-1 rounded-full`}>
                         <Text className={`text-sm font-CairoBold mt-1.5 text-gray-900 ${language === 'ar' ? 'ml-1' : 'mr-1'}`}>
-                          {ride.available_seats}
-                        </Text>
+                        {ride.available_seats}
+                      </Text>
                         <Text className={`text-xs ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'} text-gray-500`}>
                           {t.availableSeats}
                         </Text>
@@ -766,16 +766,16 @@ export default function Profile() {
                         <Image source={icons.pin} className='w-4 h-4' resizeMode='contain' tintColor={
                         "red"} style={{ marginRight: language === 'ar' ? 0 : 8, marginLeft: language === 'ar' ? 8 : 0 }} />
                         <Text className={`text-sm ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'} text-gray-600 flex-1`}>
-                          {ride.destination_address}
-                        </Text>
-                      </View>
+                        {ride.destination_address}
+                      </Text>
                     </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-        </ScrollView>
+          </View>
+        )}
+      </ScrollView>
       </View>
 
       {/* Image Preview Modal */}
