@@ -159,9 +159,6 @@ const RideDetails = () => {
 
   const { t, language } = useLanguage();
 
-  // Add new state for passenger locations
-  const [passengerLocations, setPassengerLocations] = useState<Record<string, { latitude: number; longitude: number; name: string }>>({});
-
   // Add new state for seat selection modal
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState(1);
@@ -373,24 +370,13 @@ const RideDetails = () => {
         const q = query(rideRequestsRef, where('ride_id', '==', ride.id), where('status', 'in', ['accepted', 'checked_in', 'checked_out']));
         const snapshot = await getDocs(q);
         const passengers: RideRequest[] = [];
-        const locations: Record<string, { latitude: number; longitude: number; name: string }> = {};
         
         snapshot.forEach((doc) => {
           const data = doc.data();
           passengers.push({ id: doc.id, ...data } as RideRequest);
-          
-          // If passenger has checked in, add their location
-          if (data.status === 'checked_in' && data.current_location) {
-            locations[data.user_id] = {
-              latitude: data.current_location.latitude,
-              longitude: data.current_location.longitude,
-              name: data.passenger_name || 'الراكب'
-            };
-          }
         });
         
         setAllPassengers(passengers);
-        setPassengerLocations(locations);
       } catch (error) {
         console.error('Error fetching passengers:', error);
         setError('فشل تحميل قائمة الركاب.');
@@ -684,53 +670,11 @@ const RideDetails = () => {
         return;
       }
 
-      // Get current location
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('خطأ', 'يجب السماح بالوصول إلى الموقع للمتابعة');
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const currentLocation = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        timestamp: new Date().toISOString()
-      };
-
       // Update ride request status
       await updateDoc(doc(db, 'ride_requests', rideRequest.id), {
         status: 'checked_in',
-        updated_at: serverTimestamp(),
-        current_location: currentLocation
+        updated_at: serverTimestamp()
       });
-
-      // Update user's current location
-      await updateDoc(doc(db, 'users', userId), {
-        current_location: currentLocation
-      });
-
-      // Get all active shares for this user
-      const sharesRef = collection(db, 'location_shares');
-      const q = query(sharesRef, where('shared_by', '==', userId), where('status', '==', 'active'));
-      const sharesSnapshot = await getDocs(q);
-
-      // Notify all users who share location with this passenger
-      for (const shareDoc of sharesSnapshot.docs) {
-        const shareData = shareDoc.data();
-        await sendRideStatusNotification(
-          shareData.shared_with,
-          'الراكب في الرحلة',
-          `بدأ ${passengerNames[userId] || 'الراكب'} رحلته من ${ride.origin_address} إلى ${ride.destination_address}`,
-          ride.id
-        );
-
-        // Update the location share with current location
-        await updateDoc(doc(db, 'location_shares', shareDoc.id), {
-          last_location: currentLocation,
-          last_updated: serverTimestamp()
-        });
-      }
 
       // Notify driver
       await sendRideStatusNotification(
@@ -758,20 +702,6 @@ const RideDetails = () => {
         return;
       }
 
-      // Get current location
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('خطأ', 'يجب السماح بالوصول إلى الموقع للمتابعة');
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const currentLocation = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        timestamp: new Date().toISOString()
-      };
-
       if (rideRequest.notification_id) {
         await cancelNotification(rideRequest.notification_id);
         console.log(`Cancelled notification ${rideRequest.notification_id}`);
@@ -780,36 +710,8 @@ const RideDetails = () => {
       // Update ride request status
       await updateDoc(doc(db, 'ride_requests', rideRequest.id), {
         status: 'checked_out',
-        updated_at: serverTimestamp(),
-        current_location: currentLocation
+        updated_at: serverTimestamp()
       });
-
-      // Update user's current location
-      await updateDoc(doc(db, 'users', userId), {
-        current_location: currentLocation
-      });
-
-      // Get all active shares for this user
-      const sharesRef = collection(db, 'location_shares');
-      const q = query(sharesRef, where('shared_by', '==', userId), where('status', '==', 'active'));
-      const sharesSnapshot = await getDocs(q);
-
-      // Notify all users who share location with this passenger
-      for (const shareDoc of sharesSnapshot.docs) {
-        const shareData = shareDoc.data();
-        await sendRideStatusNotification(
-          shareData.shared_with,
-          'انتهت الرحلة',
-          `انتهت رحلة ${passengerNames[userId] || 'الراكب'} من ${ride.origin_address} إلى ${ride.destination_address}`,
-          ride.id
-        );
-
-        // Update the location share with current location
-        await updateDoc(doc(db, 'location_shares', shareDoc.id), {
-          last_location: currentLocation,
-          last_updated: serverTimestamp()
-        });
-      }
 
       // Notify driver
       const notificationSent = await sendCheckOutNotificationForDriver(
@@ -2064,36 +1966,6 @@ const RideDetails = () => {
     }
   }, [ride?.ride_datetime]);
 
-  // Add real-time listener for passenger location updates
-  useEffect(() => {
-    if (!ride?.id || !isDriver) return;
-
-    const rideRequestsRef = collection(db, 'ride_requests');
-    const q = query(rideRequestsRef, where('ride_id', '==', ride.id), where('status', '==', 'checked_in'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        const data = change.doc.data();
-        if (data.current_location) {
-          setPassengerLocations(prev => {
-            const updated = {
-              ...prev,
-              [data.user_id]: {
-                latitude: data.current_location.latitude,
-                longitude: data.current_location.longitude,
-                name: data.passenger_name || 'الراكب'
-              }
-            };
-            console.log('Updated passenger locations:', JSON.stringify(updated));
-            return updated;
-          });
-        }
-      });
-    });
-
-    return () => unsubscribe();
-  }, [ride?.id, isDriver]);
-
   // Update the seat selection modal component
   const renderSeatModal = () => {
     const translateY = modalAnimation.interpolate({
@@ -2262,11 +2134,6 @@ const RideDetails = () => {
           {passenger.selected_waypoint && (
             <Text className="text-sm font-CairoRegular text-gray-600 mt-1">
               {t.currentLocation}: {passenger.selected_waypoint.address}
-            </Text>
-          )}
-          {passengerLocations[passenger.id] && (
-            <Text className="text-sm font-CairoRegular text-gray-600 mt-1">
-              {t.currentLocation}: {`${passengerLocations[passenger.id].latitude.toFixed(6)}, ${passengerLocations[passenger.id].longitude.toFixed(6)}`}
             </Text>
           )}
         </View>
