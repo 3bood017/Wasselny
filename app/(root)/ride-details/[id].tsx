@@ -1812,7 +1812,7 @@ const RideDetails = () => {
           );
         } else if (ride?.status === 'completed') {
           return (
-            <View className="p-4 m-3 bg-green-50 rounded-xl">
+            <View className="p-4 m-3 bg-green-100 items-center justify-center rounded-xl">
               <Text className={`text-gray-700 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'تم إكمال الرحلة' : 'Ride completed'}
               </Text>
@@ -1833,7 +1833,7 @@ const RideDetails = () => {
           case 'waiting':
             return (
               <View className="p-4 m-3">
-                <View className="bg-yellow-100 p-4 rounded-xl mb-3">
+                <View className="bg-yellow-100 items-center justify-center p-4 rounded-xl mb-3">
                   <Text className={`text-yellow-800 font-CairoBold text-center text-lg ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {rideRequest.is_waitlist 
                       ? (language === 'ar' ? 'في قائمة الانتظار - سيتم إخطارك عند توفر مقعد' : 'On waitlist - You will be notified when a seat is available')
@@ -1851,11 +1851,30 @@ const RideDetails = () => {
           case 'accepted':
             return (
               <View className="p-4 m-3">
-                <CustomButton
-                  title={language === 'ar' ? "تسجيل الدخول" : "Check In"}
-                  onPress={handleCheckIn}
-                  className="bg-green-500 py-3 rounded-xl mb-3"
-                />
+                {isRideTime ? (
+                  <CustomButton
+                    title={language === 'ar' ? "تسجيل الدخول" : "Check In"}
+                    onPress={handleCheckIn}
+                    className="bg-green-500 py-3 rounded-xl mb-3"
+                  />
+                ) : (
+                  <View className="mb-3">
+                    <CustomButton
+                      title={language === 'ar' ? "تسجيل الدخول" : "Check In"}
+                      onPress={handleCheckIn}
+                      className="bg-gray-400 py-3 rounded-xl"
+                      disabled={true}
+                    />
+                    <Text className={`text-center text-sm text-gray-500 mt-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {(() => {
+                        const [datePart, timePart] = ride?.ride_datetime?.split(' ') || ['', ''];
+                        return language === 'ar' 
+                          ? `يمكن تسجيل الدخول في ${timePart} بتاريخ ${datePart}`
+                          : `Check-in available at ${timePart} on ${datePart}`;
+                      })()}
+                    </Text>
+                  </View>
+                )}
                 <CustomButton
                   title={language === 'ar' ? "إلغاء الحجز" : "Cancel Booking"}
                   onPress={handleCancelRide}
@@ -1866,11 +1885,27 @@ const RideDetails = () => {
           case 'checked_in':
             return (
               <View className="p-4 m-3">
-                <CustomButton
-                  title={language === 'ar' ? "تسجيل الخروج" : "Check Out"}
-                  onPress={handleCheckOut}
-                  className="bg-orange-500 py-3 rounded-xl"
-                />
+                {ride?.status === 'in-progress' ? (
+                  <CustomButton
+                    title={language === 'ar' ? "تسجيل الخروج" : "Check Out"}
+                    onPress={handleCheckOut}
+                    className="bg-orange-500 py-3 rounded-xl"
+                  />
+                ) : (
+                  <View className="mb-3">
+                    <CustomButton
+                      title={language === 'ar' ? "تسجيل الخروج" : "Check Out"}
+                      onPress={handleCheckOut}
+                      className="bg-gray-400 py-3 rounded-xl"
+                      disabled={true}
+                    />
+                    <Text className={`text-center text-sm text-gray-500 mt-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' 
+                        ? "يمكن تسجيل الخروج بعد بدء السائق للرحلة"
+                        : "Check-out available after driver starts the ride"}
+                    </Text>
+                  </View>
+                )}
               </View>
             );
           case 'checked_out':
@@ -1918,7 +1953,7 @@ const RideDetails = () => {
     >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
         <ScrollView className="w-[90%] max-h-[80%]">
-          <View className="bg-white p-6 rounded-2xl">
+          <View className="bg-white p-6 rounded-t-3xl">
             {/* Header */}
             <View className="items-center mb-6">
               <MaterialIcons name="star" size={40} color="#f97316" />
@@ -1937,8 +1972,9 @@ const RideDetails = () => {
                     showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, overall: value }))}
                     size={35}
-                    defaultRating={rating.overall}
+                    defaultRating={rating.overall || 0}
                     selectedColor="#F79824"
+                    reviews={[]}
                   />
                 </View>
               </View>
@@ -1955,8 +1991,9 @@ const RideDetails = () => {
                     showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, driving: value }))}
                     size={35}
-                    defaultRating={rating.driving}
+                    defaultRating={rating.driving || 0}
                     selectedColor="#F79824"
+                    reviews={[]}
                   />
                 </View>
               </View>
@@ -1973,8 +2010,9 @@ const RideDetails = () => {
                     showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, behavior: value }))}
                     size={35}
-                    defaultRating={rating.behavior}
+                    defaultRating={rating.behavior || 0}
                     selectedColor="#F79824"
+                    reviews={[]}
                   />
                 </View>
               </View>
@@ -1991,8 +2029,9 @@ const RideDetails = () => {
                     showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, punctuality: value }))}
                     size={35}
-                    defaultRating={rating.punctuality}
+                    defaultRating={rating.punctuality || 0}
                     selectedColor="#F79824"
+                    reviews={[]}
                   />
                 </View>
               </View>
@@ -2009,8 +2048,9 @@ const RideDetails = () => {
                     showRating={true}
                     onFinishRating={(value: number) => setRating(prev => ({ ...prev, cleanliness: value }))}
                     size={35}
-                    defaultRating={rating.cleanliness}
+                    defaultRating={rating.cleanliness || 0}
                     selectedColor="#F79824"
+                    reviews={[]}
                   />
                 </View>
               </View>
@@ -2033,9 +2073,14 @@ const RideDetails = () => {
                 />
               </View>
             </View>
+          </View>
 
-            {/* Buttons */}
-            <View className="flex-row justify-between mt-6 space-x-3">
+
+           
+        </ScrollView>
+     
+     
+       <View className="flex-row bg-white  justify-between w-[90%] space-x-3 p-6 rounded-b-3xl">
               <CustomButton
                 title="إرسال التقييم"
                 onPress={handleRateDriver}
@@ -2049,9 +2094,7 @@ const RideDetails = () => {
                 icon={<MaterialIcons name="close" size={20} color="white" />}
               />
             </View>
-          </View>
-        </ScrollView>
-      </View>
+            </View>
     </Modal>
   );
 
