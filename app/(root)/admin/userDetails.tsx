@@ -546,22 +546,22 @@ const UserDetails = () => {
         type: 'warning',
         onConfirm: async () => {
           setAlertConfig(prev => ({ ...prev, visible: false }));
-          try {
-            const userRef = doc(db, 'users', userId as string);
-            await updateDoc(userRef, {
+    try {
+      const userRef = doc(db, 'users', userId as string);
+      await updateDoc(userRef, {
               'driver.is_active': false,
               'driver.status': 'pending'
-            });
+      });
 
-            // Update local state
-            setUserDetails(prev => prev ? {
-              ...prev,
-              driver: {
-                ...prev.driver!,
+      // Update local state
+      setUserDetails(prev => prev ? {
+        ...prev,
+        driver: {
+          ...prev.driver!,
                 is_active: false,
                 status: 'pending'
-              }
-            } : null);
+        }
+      } : null);
 
             setAlertConfig({
               visible: true,
@@ -571,8 +571,8 @@ const UserDetails = () => {
               onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
               confirmText: language === 'ar' ? 'حسنا' : 'OK'
             });
-          } catch (error) {
-            console.error('Error updating driver status:', error);
+    } catch (error) {
+      console.error('Error updating driver status:', error);
             setAlertConfig({
               visible: true,
               title: language === 'ar' ? 'خطأ' : 'Error',
@@ -872,15 +872,15 @@ const UserDetails = () => {
                   className="relative"
                 >
                   {userDetails?.profile_image_url ? (
-                    <Image 
-                      source={{ uri: userDetails.profile_image_url }}
-                      className="w-24 h-24 rounded-full mb-4"
-                    />
-                  ) : (
-                    <View className="w-24 h-24 rounded-full bg-gray-200 items-center justify-center mb-4">
-                      <MaterialCommunityIcons name="account" size={48} color="#6B7280" />
-                    </View>
-                  )}
+                  <Image 
+                    source={{ uri: userDetails.profile_image_url }}
+                    className="w-24 h-24 rounded-full mb-4"
+                  />
+                ) : (
+                  <View className="w-24 h-24 rounded-full bg-gray-200 items-center justify-center mb-4">
+                    <MaterialCommunityIcons name="account" size={48} color="#6B7280" />
+                  </View>
+                )}
                   {isUploading && (
                     <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
                       <ActivityIndicator color="white" />
@@ -1031,26 +1031,26 @@ const UserDetails = () => {
 
                   {/* Car Image Section */}
                   {userDetails.driver.car_image_url && (
-                    <View className={`w-full ${language === 'ar' ? 'items-end' : 'items-start'}`}>
-                      <Text className={`text-gray-600 ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'}`}>
-                        {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
-                      </Text>
-                      <Text className={`text-lg ${language === 'ar' ? 'font-CairoMedium text-right' : 'font-JakartaMedium text-left'}`}>
-                        {userDetails.driver.car_type || '-'}
-                      </Text>
-                      {userDetails.driver.car_image_url && (
+                  <View className={`w-full ${language === 'ar' ? 'items-end' : 'items-start'}`}>
+                    <Text className={`text-gray-600 ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'}`}>
+                      {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
+                    </Text>
+                    <Text className={`text-lg ${language === 'ar' ? 'font-CairoMedium text-right' : 'font-JakartaMedium text-left'}`}>
+                      {userDetails.driver.car_type || '-'}
+                    </Text>
+                    {userDetails.driver.car_image_url && (
                         <TouchableOpacity 
                           onPress={() => setShowFullCarImage(true)}
                           className="mt-2 w-full"
                         >
-                          <Image 
-                            source={{ uri: userDetails.driver.car_image_url }}
-                            className="w-full h-40 rounded-lg"
-                            resizeMode="cover"
-                          />
+                        <Image 
+                          source={{ uri: userDetails.driver.car_image_url }}
+                          className="w-full h-40 rounded-lg"
+                          resizeMode="cover"
+                        />
                         </TouchableOpacity>
-                      )}
-                    </View>
+                    )}
+                  </View>
                   )}
 
                   <View className={`w-full ${language === 'ar' ? 'items-end' : 'items-start'}`}>

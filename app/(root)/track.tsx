@@ -1,4 +1,5 @@
 // Suppress Reanimated strict mode warning in this file only
+
 if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
     // @ts-ignore
     global.__reanimatedWorkletInit = () => {};
@@ -68,6 +69,8 @@ import { Animated } from 'react-native';
     cancelText = 'Cancel',
     type = 'info'
   }: CustomAlertProps) => {
+    const { language } = useLanguage();
+    const isRTL = language === 'ar';
     const scaleAnim = React.useRef(new Animated.Value(0)).current;
     const opacityAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -169,21 +172,36 @@ import { Animated } from 'react-native';
                 <View style={styles.iconContainer}>
                   <MaterialIcons name={typeStyles.icon as any} size={48} color={typeStyles.color} />
                 </View>
-                <Text className="text-xl font-CairoBold text-gray-800 text-center mb-2">
-              {title}
-            </Text>
-            <Text className="text-base text-gray-600 text-center font-CairoRegular">
-              {message}
-            </Text>
-          </View>
+                <Text style={[
+                  styles.alertTitle,
+                  { fontFamily: isRTL ? 'CairoBold' : 'System' }
+                ]}>
+                  {title}
+                </Text>
+                <Text style={[
+                  styles.alertMessage,
+                  { fontFamily: isRTL ? 'CairoRegular' : 'System' }
+                ]}>
+                  {message}
+                </Text>
+              </View>
               
-              <View style={styles.alertButtons}>
+              <View style={[
+                styles.alertButtons,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' }
+              ]}>
                 {onCancel && (
                   <TouchableOpacity
                     onPress={handleCancel}
-                    style={styles.alertCancelButton}
+                    style={[
+                      styles.alertCancelButton,
+                      isRTL ? styles.alertCancelButtonRTL : styles.alertCancelButtonLTR
+                    ]}
                   >
-                    <Text style={styles.alertCancelButtonText}>
+                    <Text style={[
+                      styles.alertCancelButtonText,
+                      { fontFamily: isRTL ? 'CairoMedium' : 'System' }
+                    ]}>
                       {cancelText}
                     </Text>
                   </TouchableOpacity>
@@ -196,7 +214,10 @@ import { Animated } from 'react-native';
                     onCancel ? { flex: 1 } : { width: '100%' }
                   ]}
                 >
-                  <Text style={styles.alertConfirmButtonText}>
+                  <Text style={[
+                    styles.alertConfirmButtonText,
+                    { fontFamily: isRTL ? 'CairoMedium' : 'System' }
+                  ]}>
                     {confirmText}
                   </Text>
                 </TouchableOpacity>
@@ -409,6 +430,7 @@ import { Animated } from 'react-native';
           const sharesSnapshot = await getDocs(sharesQuery);
           const activeRecipients = new Set(sharesSnapshot.docs.map(doc => doc.data().recipient_id));
           
+          // Filter out users that are already in active shares
           usersSnapshot.forEach(doc => {
             if (doc.id !== user.id && !activeRecipients.has(doc.id)) {
               const userData = doc.data();
@@ -425,11 +447,19 @@ import { Animated } from 'react-native';
           setFilteredUsers(usersList);
         } catch (error) {
           console.error('Error fetching app users:', error);
+          setAlertConfig({
+            visible: true,
+            title: isRTL ? 'خطأ' : 'Error',
+            message: isRTL ? 'حدث خطأ أثناء تحميل قائمة المستخدمين' : 'An error occurred while loading users list',
+            type: 'error',
+            onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+            confirmText: isRTL ? 'حسنا' : 'OK'
+          });
         }
       };
   
       fetchAppUsers();
-    }, [user?.id]);
+    }, [user?.id, myShares]);
   
     // Filter users based on search query
     useEffect(() => {
@@ -446,18 +476,24 @@ import { Animated } from 'react-native';
   
     // Format elapsed time
     const formatTimeElapsed = (timestamp: string) => {
-      if (!timestamp) return "Never";
+      if (!timestamp) return isRTL ? "لم يتم التحديث" : "Never";
       
       const lastUpdated = new Date(timestamp);
       const seconds = Math.floor((now.getTime() - lastUpdated.getTime()) / 1000);
       
       if (seconds < 60) {
-        return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+        return isRTL 
+          ? `منذ ${seconds} ثانية${seconds !== 1 ? '' : 'ة'}`
+          : `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
       } else if (seconds < 3600) {
         const minutes = Math.floor(seconds / 60);
-        return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        return isRTL
+          ? `منذ ${minutes} دقيقة${minutes !== 1 ? '' : ''}`
+          : `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
       } else {
-        return lastUpdated.toLocaleTimeString();
+        return isRTL
+          ? lastUpdated.toLocaleTimeString('ar-SA')
+          : lastUpdated.toLocaleTimeString();
       }
     };
   
@@ -468,6 +504,15 @@ import { Animated } from 'react-native';
         await updateDoc(doc(db, 'location_sharing', docId), { is_active: false });
         const stoppedShare = myShares.find(share => share.docId === docId);
         const recipientName = stoppedShare?.recipient?.name || (isRTL ? 'المستخدم' : 'the user');
+        
+        // Clear tracking interval if this was the last active share
+        const remainingShares = myShares.filter(share => share.docId !== docId && share.is_active);
+        if (remainingShares.length === 0 && trackingInterval) {
+          clearInterval(trackingInterval);
+          setTrackingInterval(null);
+          setIsLocationSharing(false);
+        }
+        
         setAlertConfig({
           visible: true,
           title: isRTL ? 'تم الايقاف' : 'Stopped',
@@ -792,35 +837,45 @@ import { Animated } from 'react-native';
       </TouchableOpacity>
     ), [selectedUser]);
   
+    // Render request item
     const renderRequestItem = useCallback(({ item }: { item: any }) => (
       <TouchableOpacity
-        style={styles.requestItem}
+        className="flex-row items-center p-4 border-b border-gray-100"
         onPress={() => viewSharerLocation(item)}
       >
-        <View style={styles.userAvatar}>
+        <View className="w-10 h-10 rounded-full bg-gray-200 justify-center items-center mr-3">
           {item.sharer.profile_image ? (
             <Image 
               source={{ uri: item.sharer.profile_image }} 
-              style={styles.avatarImage}
+              className="w-10 h-10 rounded-full"
             />
           ) : (
-            <Text style={styles.avatarText}>
+            <Text className="text-gray-500 font-CairoBold">
               {(item.sharer.name?.charAt(0) || '?').toUpperCase()}
             </Text>
           )}
         </View>
-        <View style={styles.requestInfo}>
-          <Text style={styles.requestName}>{item.sharer.name}</Text>
-          <Text style={styles.requestEmail}>{item.sharer.email}</Text>
-          <Text style={styles.requestTime}>
-            Last updated: {formatTimeElapsed(item.last_updated)}
+        <View className="flex-1">
+          <Text className="text-base font-CairoBold text-gray-800">
+            {item.sharer.name}
+          </Text>
+          <Text className="text-sm font-CairoRegular text-gray-500">
+            {item.sharer.email}
+          </Text>
+          <Text className="text-xs font-CairoRegular text-gray-400 mt-1">
+            {isRTL ? 'آخر تحديث: ' : 'Last updated: '}{formatTimeElapsed(item.last_updated)}
           </Text>
         </View>
-        <View style={styles.viewButton}>
-          <Text style={styles.viewButtonText}>View</Text>
-        </View>
+        <TouchableOpacity 
+          className="bg-orange-50 px-4 py-2 rounded-full"
+          onPress={() => viewSharerLocation(item)}
+        >
+          <Text className="text-orange-500 font-CairoMedium">
+            {isRTL ? 'عرض' : 'View'}
+          </Text>
+        </TouchableOpacity>
       </TouchableOpacity>
-    ), [viewSharerLocation, formatTimeElapsed]);
+    ), [viewSharerLocation, formatTimeElapsed, isRTL]);
   
     // Render search user modal
     const renderSearchModal = () => {
@@ -829,8 +884,8 @@ import { Animated } from 'react-native';
       return (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+            <View className={`${language === 'ar' ? 'flex-row' : 'flex-row'} justify-between items-center mb-4`}>
+              <Text className="text-xl font-CairoBold text-gray-800">
                 {isRTL ? 'مشاركة الموقع مع' : 'Share Location With'}
               </Text>
               <TouchableOpacity 
@@ -838,16 +893,16 @@ import { Animated } from 'react-native';
                   setActiveModal('none');
                   setSearchQuery('');
                 }}
-                style={styles.closeButton}
+                className="p-1"
               >
                 <AntDesign name="close" size={24} color="#374151" />
               </TouchableOpacity>
             </View>
             
-            <View style={styles.searchContainer}>
+            <View className="flex-row items-center bg-gray-100 rounded-3xl px-4 py-2 mb-4">
               <AntDesign name="search1" size={20} color="#9ca3af" />
               <TextInput
-                style={styles.searchInput}
+                className="flex-1 ml-2 text-gray-800 text-base"
                 placeholder={isRTL ? "بحث عن مستخدم..." : "Search user..."}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -863,31 +918,28 @@ import { Animated } from 'react-native';
               data={filteredUsers}
               renderItem={({ item }) => (
                 <TouchableOpacity 
-                  style={[
-                    styles.userItem,
-                    selectedUser?.id === item.id ? styles.selectedUserItem : null
-                  ]}
+                  className={`flex-row items-center p-3 border-b border-gray-100 ${selectedUser?.id === item.id ? 'bg-orange-50' : ''}`}
                   onPress={() => {
                     setSelectedUser(item);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.userAvatar}>
+                  <View className="w-10 h-10 rounded-full bg-gray-200 justify-center items-center mr-3">
                     {item.profile_image ? (
                       <Image 
                         source={{ uri: item.profile_image }} 
-                        style={styles.avatarImage}
+                        className="w-10 h-10 rounded-full"
                       />
                     ) : (
-                      <Text style={styles.avatarText}>
+                      <Text className="text-gray-500 font-CairoBold">
                         {(item.name?.charAt(0) || item.email?.charAt(0) || '?').toUpperCase()}
                       </Text>
                     )}
                   </View>
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{item.name || item.email || 'User'}</Text>
-                    <Text style={styles.userEmail}>{item.email}</Text>
+                  <View className="flex-1">
+                    <Text className="text-base font-CairoBold text-gray-800">{item.name || item.email || 'User'}</Text>
+                    <Text className="text-sm font-CairoRegular text-gray-500">{item.email}</Text>
                   </View>
                   {selectedUser?.id === item.id && (
                     <MaterialIcons name="check-circle" size={24} color="#f97316" />
@@ -896,36 +948,30 @@ import { Animated } from 'react-native';
               )}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
-                <View style={styles.emptyListContainer}>
-                  <Text style={styles.emptyListText}>
+                <View className="p-6 items-center">
+                  <Text className="text-gray-500 font-CairoRegular text-center">
                     {isRTL ? 'لم يتم العثور على مستخدمين' : 'No users found'}
                   </Text>
                 </View>
               }
-              contentContainerStyle={styles.usersList}
+              contentContainerStyle={{ flexGrow: 1 }}
             />
 
-            <View style={styles.actionButtons}>
+            <View className="flex-row mt-4">
               <TouchableOpacity 
-                style={[
-                  styles.actionButton,
-                  styles.cancelButton
-                ]}
+                className="flex-1 bg-gray-100 py-3 rounded-xl mr-2 items-center justify-center"
                 onPress={() => {
                   setActiveModal('none');
                   setSearchQuery('');
                 }}
               >
-                <Text style={styles.cancelButtonText}>
+                <Text className="text-gray-800 font-CairoMedium text-base">
                   {isRTL ? 'إلغاء' : 'Cancel'}
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[
-                  styles.actionButton,
-                  selectedUser ? styles.confirmButton : styles.disabledButton
-                ]}
+                className={`flex-1 py-3 rounded-xl items-center justify-center ${selectedUser ? 'bg-orange-500' : 'bg-gray-300'}`}
                 onPress={() => {
                   if (selectedUser) {
                     startLocationSharing();
@@ -937,10 +983,7 @@ import { Animated } from 'react-native';
                 {isRefreshing ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={[
-                    styles.confirmButtonText,
-                    !selectedUser && styles.disabledButtonText
-                  ]}>
+                  <Text className={`font-CairoMedium text-base ${selectedUser ? 'text-white' : 'text-gray-500'}`}>
                     {isRTL ? 'بدء المشاركة' : 'Start Sharing'}
                   </Text>
                 )}
@@ -1019,13 +1062,15 @@ import { Animated } from 'react-native';
       if (activeModal !== 'shares') return null;
       
       return (
-        <View style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>My Shares</Text>
+            <View className={`${language === 'ar' ? 'flex-row' : 'flex-row'}  justify-between items-center mb-4`}>
+              <Text className="text-xl font-CairoBold text-gray-800">
+                {isRTL ? 'مشاركاتي' : 'My Shares'}
+              </Text>
               <TouchableOpacity 
                 onPress={() => setActiveModal('none')}
-                style={styles.closeButton}
+                className="p-1"
               >
                 <AntDesign name="close" size={24} color="#374151" />
               </TouchableOpacity>
@@ -1033,14 +1078,14 @@ import { Animated } from 'react-native';
             
             {myShares.length > 0 && (
               <TouchableOpacity
-                style={[styles.updateAllButton, isUpdatingAll && styles.updateAllButtonDisabled]}
+                className={`bg-orange-500 py-3 px-4 rounded-lg mx-4 mb-4 items-center justify-center min-h-[44px] ${isUpdatingAll ? 'opacity-70' : ''}`}
                 onPress={updateAllSharedLocations}
                 disabled={isUpdatingAll}
               >
                 {isUpdatingAll ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={styles.updateAllButtonText}>
+                  <Text className="text-white font-CairoBold text-base">
                     {isRTL ? 'تحديث الموقع للجميع' : 'Update Location for All'}
                   </Text>
                 )}
@@ -1051,31 +1096,42 @@ import { Animated } from 'react-native';
               data={myShares}
               keyExtractor={item => item.docId}
               renderItem={({ item }) => (
-                <View style={styles.shareItem}>
-                  <View style={styles.userAvatar}>
+                <View className="flex-row items-center p-3 border-b border-gray-100">
+                  <TouchableOpacity 
+                    onPress={() => {
+                      router.push(`/profile/${item.recipient.id}`);
+                      setActiveModal('none');
+                    }}
+                    className="w-10 h-10 rounded-full bg-gray-200 justify-center items-center mr-2"
+                  >
                     {item.recipient.profile_image ? (
                       <Image 
                         source={{ uri: item.recipient.profile_image }} 
-                        style={styles.avatarImage}
+                        className="w-10 h-10 rounded-full"
                       />
                     ) : (
-                      <Text style={styles.avatarText}>
+                      <Text className="text-gray-500 font-CairoBold">
                         {(item.recipient.name?.charAt(0) || '?').toUpperCase()}
                       </Text>
                     )}
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{item.recipient.name}</Text>
-                    <Text style={styles.userEmail}>{item.recipient.email}</Text>
-                    <Text style={styles.lastUpdated}>
-                      Last updated: {formatTimeElapsed(item.last_updated)}
+                  </TouchableOpacity>
+                  <View className="flex-1">
+                    <TouchableOpacity 
+                      onPress={() => {
+                        router.push(`/profile/${item.recipient.id}`);
+                        setActiveModal('none');
+                      }}
+                      className="mb-1"
+                    >
+                      <Text className="text-base font-CairoBold text-gray-800">{item.recipient.name}</Text>
+                    </TouchableOpacity>
+                    <Text className="text-sm font-CairoRegular text-gray-500">{item.recipient.email}</Text>
+                    <Text className="text-xs font-CairoRegular text-gray-400 mt-1">
+                      {isRTL ? 'آخر تحديث: ' : 'Last updated: '}{formatTimeElapsed(item.last_updated)}
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={[
-                      styles.stopButton,
-                      stoppingShares.has(item.docId) && styles.stopButtonDisabled
-                    ]}
+                    className={`bg-red-500 py-2 px-4 rounded-lg min-w-[80px] min-h-[36px] justify-center items-center ${stoppingShares.has(item.docId) ? 'opacity-70' : ''}`}
                     onPress={() => {
                       stopSharing(item.docId);
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1085,22 +1141,78 @@ import { Animated } from 'react-native';
                     {stoppingShares.has(item.docId) ? (
                       <ActivityIndicator size="small" color="white" />
                     ) : (
-                      <Text style={styles.stopButtonText}>Stop</Text>
+                      <Text className="text-white font-CairoBold text-sm">
+                        {isRTL ? 'إيقاف' : 'Stop'}
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>
               )}
               ListEmptyComponent={
-                <View style={styles.emptyListContainer}>
-                  <Text style={styles.emptyListText}>
+                <View className="p-6 items-center">
+                  <Text className="text-gray-500 font-CairoRegular text-center">
                     {isRTL ? 'لا توجد مشاركات نشطة' : 'No active shares'}
                   </Text>
                 </View>
               }
-              contentContainerStyle={styles.sharesList}
+              contentContainerStyle={{ flexGrow: 1 }}
             />
           </View>
         </View>
+      );
+    };
+  
+    // Render bottom sheet content
+    const renderBottomSheetContent = () => {
+      if (loading) {
+        return (
+          <View className="flex-1">
+            {[1, 2, 3].map((_, index) => (
+              <View key={index} className="flex-row items-center p-4 border-b border-gray-100">
+                <View className="w-10 h-10 rounded-full bg-gray-200" />
+                <View className="flex-1 ml-4">
+                  <View className="h-4 bg-gray-200 rounded w-32 mb-2" />
+                  <View className="h-3 bg-gray-200 rounded w-48 mb-2" />
+                  <View className="h-3 bg-gray-200 rounded w-24" />
+                </View>
+                <View className="w-16 h-8 bg-gray-200 rounded-full" />
+              </View>
+            ))}
+          </View>
+        );
+      }
+
+      if (trackRequests.length === 0) {
+        return (
+          <View className="flex-1 justify-center items-center p-4">
+            <Text className="text-gray-500 font-CairoRegular text-center">
+              {isRTL ? 'لا توجد طلبات موقع نشطة' : 'No active location requests'}
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <BottomSheetFlatList
+          data={trackRequests}
+          keyExtractor={item => item.docId}
+          renderItem={renderRequestItem}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          initialNumToRender={5}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={fetchUserLocation}
+              colors={['#f97316']}
+              tintColor="#f97316"
+              title={isRTL ? 'جاري التحديث...' : 'Refreshing...'}
+              titleColor="#f97316"
+              progressViewOffset={20}
+            />
+          }
+        />
       );
     };
   
@@ -1263,48 +1375,11 @@ import { Animated } from 'react-native';
             enablePanDownToClose={false}
             handleIndicatorStyle={{ backgroundColor: '#9ca3af', width: 50 }}
           >
-            <View style={styles.bottomSheetContainer}>
-              <Text style={styles.bottomSheetTitle}>Location Requests</Text>
-              {loading ? (
-                <View style={styles.bottomSheetContent}>
-                  {[1, 2, 3].map((_, index) => (
-                    <View key={index} className="flex-row items-center p-4 border-b border-gray-100">
-                      <View className="w-10 h-10 rounded-full bg-gray-200" />
-                      <View className="flex-1 ml-4">
-                        <View className="h-4 bg-gray-200 rounded w-32 mb-2" />
-                        <View className="h-3 bg-gray-200 rounded w-48 mb-2" />
-                        <View className="h-3 bg-gray-200 rounded w-24" />
-                      </View>
-                      <View className="w-16 h-8 bg-gray-200 rounded-full" />
-                    </View>
-                  ))}
-                </View>
-              ) : trackRequests.length === 0 ? (
-                <View style={styles.emptyListContainer}>
-                  <Text style={styles.emptyListText}>No active location requests</Text>
-                </View>
-              ) : (
-                <BottomSheetFlatList
-                  data={trackRequests}
-                  keyExtractor={item => item.docId}
-                  renderItem={renderRequestItem}
-                  contentContainerStyle={styles.bottomSheetContent}
-                  initialNumToRender={5}
-                  maxToRenderPerBatch={10}
-                  windowSize={5}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={isRefreshing}
-                      onRefresh={fetchUserLocation}
-                      colors={['#f97316']}
-                      tintColor="#f97316"
-                      title={isRTL ? 'جاري التحديث...' : 'Refreshing...'}
-                      titleColor="#f97316"
-                      progressViewOffset={20}
-                    />
-                  }
-                />
-              )}
+            <View className={`flex-1 bg-white`}>
+              <Text className={`text-lg font-CairoBold text-gray-800 px-4 py-4 ${language === 'ar' ? "text-right" : "text-left"} `}>
+                {isRTL ? 'طلبات الموقع' : 'Location Requests'}
+              </Text>
+              {renderBottomSheetContent()}
             </View>
           </BottomSheet>
   
@@ -1619,7 +1694,7 @@ import { Animated } from 'react-native';
       left: 0,
       right: 0,
       bottom: 0,
-      zIndex: 9999,
+      zIndex: 1000,
     },
     alertOverlay: {
       flex: 1,
@@ -1657,17 +1732,23 @@ import { Animated } from 'react-native';
       fontSize: 16,
       color: '#4b5563',
       textAlign: 'center',
+      lineHeight: 22,
     },
     alertButtons: {
-      flexDirection: 'row',
       borderTopWidth: 1,
       borderTopColor: '#e5e7eb',
     },
     alertCancelButton: {
       flex: 1,
       paddingVertical: 16,
+    },
+    alertCancelButtonLTR: {
       borderRightWidth: 1,
       borderRightColor: '#e5e7eb',
+    },
+    alertCancelButtonRTL: {
+      borderLeftWidth: 1,
+      borderLeftColor: '#e5e7eb',
     },
     alertConfirmButton: {
       paddingVertical: 16,
