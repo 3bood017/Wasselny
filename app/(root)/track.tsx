@@ -210,17 +210,17 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
           const usersSnapshot = await getDocs(usersRef);
           const usersList: AppUser[] = [];
           
-          // Get all active shares where current user is the recipient
+          // Get all active shares where current user is the sharer
           const sharesQuery = query(
             collection(db, 'location_sharing'),
-            where('recipient_id', '==', user.id),
+            where('sharer_id', '==', user.id),
             where('is_active', '==', true)
           );
           const sharesSnapshot = await getDocs(sharesQuery);
-          const activeSharers = new Set(sharesSnapshot.docs.map(doc => doc.data().sharer_id));
+          const activeRecipients = new Set(sharesSnapshot.docs.map(doc => doc.data().recipient_id));
           
           usersSnapshot.forEach(doc => {
-            if (doc.id !== user.id && !activeSharers.has(doc.id)) {
+            if (doc.id !== user.id && !activeRecipients.has(doc.id)) {
               const userData = doc.data();
               usersList.push({
                 id: doc.id,
