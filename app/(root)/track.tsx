@@ -22,6 +22,7 @@ if (__DEV__ && (global as any)._REANIMATED_VERSION_3) {
 import Header from '@/components/Header';
 import * as Notifications from 'expo-notifications';
 import { sendLocationUpdateNotification } from '@/lib/notifications';
+import { Animated } from 'react-native';
   
   // Types
   interface AppUser {
@@ -45,6 +46,167 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
     latitude: number;
     longitude: number;
   }
+
+  interface CustomAlertProps {
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'success' | 'error' | 'warning' | 'info';
+  }
+
+  const CustomAlert = ({ 
+    visible, 
+    title, 
+    message, 
+    onConfirm, 
+    onCancel, 
+    confirmText = 'OK',
+    cancelText = 'Cancel',
+    type = 'info'
+  }: CustomAlertProps) => {
+    const scaleAnim = React.useRef(new Animated.Value(0)).current;
+    const opacityAnim = React.useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+      if (visible) {
+        Animated.parallel([
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true
+          })
+        ]).start();
+      } else {
+        Animated.parallel([
+          Animated.spring(scaleAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true
+          })
+        ]).start();
+      }
+    }, [visible]);
+
+    const handleConfirm = () => {
+      onConfirm();
+    };
+
+    const handleCancel = () => {
+      if (onCancel) {
+        onCancel();
+      }
+    };
+
+    const getTypeStyles = () => {
+      switch (type) {
+        case 'success':
+          return {
+            icon: 'check-circle',
+            color: '#22c55e',
+            bgColor: '#dcfce7'
+          };
+        case 'error':
+          return {
+            icon: 'error',
+            color: '#ef4444',
+            bgColor: '#fee2e2'
+          };
+        case 'warning':
+          return {
+            icon: 'warning',
+            color: '#f97316',
+            bgColor: '#ffedd5'
+          };
+        default:
+          return {
+            icon: 'info',
+            color: '#3b82f6',
+            bgColor: '#dbeafe'
+          };
+      }
+    };
+
+    const typeStyles = getTypeStyles();
+
+    if (!visible) return null;
+
+    return (
+      <View style={styles.alertRoot}>
+        <TouchableOpacity 
+          style={styles.alertOverlay}
+          activeOpacity={1}
+          onPress={handleCancel}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+            style={styles.alertContent}
+          >
+            <Animated.View 
+              style={[
+                styles.alertContainer,
+                { transform: [{ scale: scaleAnim }] },
+                { opacity: opacityAnim }
+              ]}
+            >
+              <View style={[styles.alertHeader, { backgroundColor: typeStyles.bgColor }]}>
+                <View style={styles.iconContainer}>
+                  <MaterialIcons name={typeStyles.icon as any} size={48} color={typeStyles.color} />
+                </View>
+                <Text className="text-xl font-CairoBold text-gray-800 text-center mb-2">
+              {title}
+            </Text>
+            <Text className="text-base text-gray-600 text-center font-CairoRegular">
+              {message}
+            </Text>
+          </View>
+              
+              <View style={styles.alertButtons}>
+                {onCancel && (
+                  <TouchableOpacity
+                    onPress={handleCancel}
+                    style={styles.alertCancelButton}
+                  >
+                    <Text style={styles.alertCancelButtonText}>
+                      {cancelText}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={handleConfirm}
+                  style={[
+                    styles.alertConfirmButton,
+                    { backgroundColor: typeStyles.color },
+                    onCancel ? { flex: 1 } : { width: '100%' }
+                  ]}
+                >
+                  <Text style={styles.alertConfirmButtonText}>
+                    {confirmText}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
+    );
+  };
   
   export default function Track() {
     // Context and state
@@ -73,6 +235,22 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
     const [isInitialLoading, setIsInitialLoading] = useState(true);
     const [stoppingShares, setStoppingShares] = useState<Set<string>>(new Set());
     const [isUpdatingAll, setIsUpdatingAll] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+      visible: boolean;
+      title: string;
+      message: string;
+      type: 'success' | 'error' | 'warning' | 'info';
+      onConfirm: () => void;
+      confirmText?: string;
+      onCancel?: () => void;
+      cancelText?: string;
+    }>({
+      visible: false,
+      title: '',
+      message: '',
+      type: 'info',
+      onConfirm: () => {},
+    });
   
     // Timer for updating times
     useEffect(() => {
@@ -89,10 +267,14 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
           setIsInitialLoading(true);
           let { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== 'granted') {
-            Alert.alert(
-              'Location Permission',
-              'Location permission is required to use the tracking features.'
-            );
+            setAlertConfig({
+              visible: true,
+              title: isRTL ? 'تنبيه الموقع' : 'Location Alert',
+              message: isRTL ? 'يجب منح إذن للوصول إلى الموقع لاستخدام ميزات التتبع' : 'Location permission is required to use the tracking features.',
+              type: 'warning',
+              onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+              confirmText: isRTL ? 'حسنا' : 'OK'
+            });
             return;
           }
           
@@ -106,6 +288,14 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
           });
         } catch (error) {
           console.error('Error getting location:', error);
+          setAlertConfig({
+            visible: true,
+            title: isRTL ? 'خطأ في الموقع' : 'Location Error',
+            message: isRTL ? 'حدث خطأ أثناء محاولة الحصول على موقعك' : 'An error occurred while trying to get your location',
+            type: 'error',
+            onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+            confirmText: isRTL ? 'حسنا' : 'OK'
+          });
         } finally {
           setIsInitialLoading(false);
           setLoading(false);
@@ -274,16 +464,29 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
     // Stop sharing location with a recipient
     const stopSharing = async (docId: string) => {
       try {
-        // Add the share to stopping state
         setStoppingShares(prev => new Set(prev).add(docId));
-        
         await updateDoc(doc(db, 'location_sharing', docId), { is_active: false });
-        Alert.alert('Success', 'Location sharing stopped');
+        const stoppedShare = myShares.find(share => share.docId === docId);
+        const recipientName = stoppedShare?.recipient?.name || (isRTL ? 'المستخدم' : 'the user');
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'تم الايقاف' : 'Stopped',
+          message: isRTL ? `تم إيقاف مشاركة الموقع مع ${recipientName}` : `Location sharing stopped with ${recipientName}`,
+          type: 'success',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
       } catch (error) {
         console.error('Error stopping sharing:', error);
-        Alert.alert('Error', 'Could not stop sharing location');
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'خطأ' : 'Error',
+          message: isRTL ? 'فشل في إيقاف مشاركة الموقع' : 'Could not stop sharing location',
+          type: 'error',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
       } finally {
-        // Remove the share from stopping state
         setStoppingShares(prev => {
           const newSet = new Set(prev);
           newSet.delete(docId);
@@ -322,10 +525,14 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
         // Request location permissions
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert(
-            isRTL ? 'تنبيه الموقع' : 'Location Alert',
-            isRTL ? 'لم يتم منح إذن الوصول إلى الموقع' : 'Location permission was not granted'
-          );
+          setAlertConfig({
+            visible: true,
+            title: isRTL ? 'تنبيه الموقع' : 'Location Alert',
+            message: isRTL ? 'يجب منح إذن للوصول إلى الموقع لاستخدام ميزات التتبع' : 'Location permission is required to use the tracking features.',
+            type: 'warning',
+            onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+            confirmText: isRTL ? 'حسنا' : 'OK'
+          });
           setIsRefreshing(false);
           return;
         }
@@ -368,10 +575,14 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
         setLoading(false);
       } catch (error) {
         console.error('Error getting location:', error);
-        Alert.alert(
-          isRTL ? 'خطأ في الموقع' : 'Location Error',
-          isRTL ? 'حدث خطأ أثناء محاولة الحصول على موقعك' : 'An error occurred while trying to get your location'
-        );
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'خطأ في الموقع' : 'Location Error',
+          message: isRTL ? 'حدث خطأ أثناء محاولة الحصول على موقعك' : 'An error occurred while trying to get your location',
+          type: 'error',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
         setIsRefreshing(false);
         setLoading(false);
       }
@@ -439,10 +650,14 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
       try {
         // Validate required data
         if (!selectedUser || !userLocation || !user?.id) {
-          Alert.alert(
-            isRTL ? 'خطأ' : 'Error',
-            isRTL ? 'لا يمكن مشاركة الموقع، يرجى تحديث موقعك واختيار مستخدم' : 'Cannot share location, please refresh your location and select a user'
-          );
+          setAlertConfig({
+            visible: true,
+            title: isRTL ? 'خطأ' : 'Error',
+            message: isRTL ? 'لا يمكن مشاركة الموقع، يرجى تحديث موقعك واختيار مستخدم' : 'Cannot share location, please refresh your location and select a user',
+            type: 'error',
+            onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+            confirmText: isRTL ? 'حسنا' : 'OK'
+          });
           return;
         }
 
@@ -505,20 +720,28 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
         // Close modal and show success message
         setActiveModal('none');
         
-        Alert.alert(
-          isRTL ? 'مشاركة الموقع نشطة' : 'Location Sharing Active',
-          isRTL ? `أنت الآن تشارك موقعك مع ${selectedUser.name}` : `You are now sharing your location with ${selectedUser.name}`
-        );
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'مشاركة الموقع نشطة' : 'Location Sharing Active',
+          message: isRTL ? `أنت الآن تشارك موقعك مع ${selectedUser.name}` : `You are now sharing your location with ${selectedUser.name}`,
+          type: 'success',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
       } catch (error) {
         console.error('Error starting location sharing:', error);
         
         // Hide loading indicator
         setIsRefreshing(false);
         
-        Alert.alert(
-          isRTL ? 'خطأ' : 'Error',
-          isRTL ? 'فشل في بدء مشاركة الموقع' : 'Failed to start location sharing'
-        );
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'خطأ' : 'Error',
+          message: isRTL ? 'فشل في بدء مشاركة الموقع' : 'Failed to start location sharing',
+          type: 'error',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
       }
     };
   
@@ -768,16 +991,24 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
         }
         
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
-          isRTL ? 'تم التحديث' : 'Updated',
-          isRTL ? 'تم تحديث موقعك لجميع المستخدمين' : 'Your location has been updated for all users'
-        );
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'تم التحديث' : 'Updated',
+          message: isRTL ? 'تم تحديث موقعك لجميع المستخدمين' : 'Your location has been updated for all users',
+          type: 'success',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
       } catch (error) {
         console.error('Error updating all locations:', error);
-        Alert.alert(
-          isRTL ? 'خطأ' : 'Error',
-          isRTL ? 'فشل في تحديث الموقع' : 'Failed to update location'
-        );
+        setAlertConfig({
+          visible: true,
+          title: isRTL ? 'خطأ' : 'Error',
+          message: isRTL ? 'فشل في تحديث الموقع' : 'Failed to update location',
+          type: 'error',
+          onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+          confirmText: isRTL ? 'حسنا' : 'OK'
+        });
       } finally {
         setIsUpdatingAll(false);
       }
@@ -1080,6 +1311,18 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
           {/* Render modals */}
           {renderSearchModal()}
           {renderMySharesModal()}
+
+          {/* Custom Alert */}
+          <CustomAlert
+            visible={alertConfig.visible}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            type={alertConfig.type}
+            onConfirm={alertConfig.onConfirm}
+            onCancel={alertConfig.onCancel}
+            confirmText={alertConfig.confirmText}
+            cancelText={alertConfig.cancelText}
+          />
         </SafeAreaView>
       </GestureHandlerRootView>
     );
@@ -1087,8 +1330,8 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
   
   const styles = StyleSheet.create({
     androidShadow: {
-          elevation: 5,
-        },
+      elevation: 5,
+    },
     iosShadow: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -1351,80 +1594,6 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
       backgroundColor: '#f3f4f6',
       borderRadius: 16
     },
-    // Skeleton styles
-    skeletonItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f3f4f6'
-    },
-    skeletonAvatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: '#e5e7eb',
-      opacity: 0.7
-    },
-    skeletonContent: {
-      flex: 1,
-      marginLeft: 12
-    },
-    skeletonName: {
-      height: 16,
-      width: '60%',
-      backgroundColor: '#e5e7eb',
-      borderRadius: 4,
-      marginBottom: 8,
-      opacity: 0.7
-    },
-    skeletonEmail: {
-      height: 14,
-      width: '80%',
-      backgroundColor: '#e5e7eb',
-      borderRadius: 4,
-      marginBottom: 8,
-      opacity: 0.7
-    },
-    skeletonTime: {
-      height: 12,
-      width: '40%',
-      backgroundColor: '#e5e7eb',
-      borderRadius: 4,
-      opacity: 0.7
-    },
-    skeletonButton: {
-      width: 60,
-      height: 32,
-      backgroundColor: '#e5e7eb',
-      borderRadius: 16,
-      opacity: 0.7
-    },
-    skeletonHeaderButton: {
-      width: 24,
-      height: 24,
-      backgroundColor: '#e5e7eb',
-      borderRadius: 12,
-      opacity: 0.7
-    },
-    skeletonHeaderTitle: {
-      width: 150,
-      height: 24,
-      backgroundColor: '#e5e7eb',
-      borderRadius: 4,
-      opacity: 0.7
-    },
-    skeletonBottomSheetTitle: {
-      height: 24,
-      width: 200,
-      backgroundColor: '#e5e7eb',
-      borderRadius: 4,
-      marginBottom: 16,
-      marginHorizontal: 16,
-      marginTop: 16,
-      opacity: 0.7
-    },
     updateAllButton: {
       backgroundColor: '#f97316',
       paddingVertical: 12,
@@ -1443,5 +1612,76 @@ import { sendLocationUpdateNotification } from '@/lib/notifications';
       color: 'white',
       fontWeight: 'bold',
       fontSize: 16
-    }
+    },
+    alertRoot: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 9999,
+    },
+    alertOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    alertContent: {
+      width: '100%',
+      height: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    alertContainer: {
+      width: '85%',
+      backgroundColor: 'white',
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    alertHeader: {
+      padding: 24,
+    },
+    iconContainer: {
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    alertTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: '#1f2937',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    alertMessage: {
+      fontSize: 16,
+      color: '#4b5563',
+      textAlign: 'center',
+    },
+    alertButtons: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: '#e5e7eb',
+    },
+    alertCancelButton: {
+      flex: 1,
+      paddingVertical: 16,
+      borderRightWidth: 1,
+      borderRightColor: '#e5e7eb',
+    },
+    alertConfirmButton: {
+      paddingVertical: 16,
+    },
+    alertCancelButtonText: {
+      fontSize: 16,
+      color: '#4b5563',
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+    alertConfirmButtonText: {
+      fontSize: 16,
+      color: 'white',
+      textAlign: 'center',
+      fontWeight: '500',
+    },
   }); 
