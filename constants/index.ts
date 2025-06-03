@@ -55,6 +55,7 @@ import music from "@/assets/icons/music.png";
 import children from "@/assets/icons/children.png";
 import translate from "@/assets/icons/Translate.png";
 import barriers from "@/assets/icons/barriers.png";
+import history from "@/assets/icons/history.png";
 
 
 
@@ -72,6 +73,7 @@ export const images = {
 };
 
 export const icons = {
+    history,
     barriers,
     translate,
     repeat,

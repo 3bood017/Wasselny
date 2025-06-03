@@ -16,6 +16,7 @@ import Modal from 'react-native-modal'
 import debounce from 'lodash/debounce'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { MaterialIcons } from '@expo/vector-icons'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // Constants
 const MAX_DISTANCE_KM = 500
@@ -163,6 +164,37 @@ const Search = () => {
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [showRecentSearches, setShowRecentSearches] = useState(false)
+  const recentSearchesTimeout = useRef<NodeJS.Timeout | null>(null)
+
+  const styles = StyleSheet.create({
+    androidShadow: {
+      elevation: 8,
+      backgroundColor: 'white',
+      borderRadius: 20,
+    },
+    iosShadow: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      backgroundColor: 'white',
+      borderRadius: 20,
+    },
+    androidShadow1: {
+      elevation: 8,
+      borderRadius: 20,
+    },
+    iosShadow1: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      borderRadius: 20,
+    },
+  })
+  
 
   // Fetch user profile image
   useEffect(() => {
@@ -301,6 +333,46 @@ const Search = () => {
     }
   }, [])
 
+  // Load recent searches
+  useEffect(() => {
+    loadRecentSearches()
+  }, [])
+
+  // Load recent searches from AsyncStorage
+  const loadRecentSearches = async () => {
+    try {
+      const searches = await AsyncStorage.getItem('recentSearches')
+      if (searches) {
+        setRecentSearches(JSON.parse(searches))
+      }
+    } catch (error) {
+      console.error('Error loading recent searches:', error)
+    }
+  }
+
+  // Save recent search
+  const saveRecentSearch = async (search: string) => {
+    if (!search.trim()) return
+    
+    try {
+      const updatedSearches = [search, ...recentSearches.filter(s => s !== search)].slice(0, 5)
+      await AsyncStorage.setItem('recentSearches', JSON.stringify(updatedSearches))
+      setRecentSearches(updatedSearches)
+    } catch (error) {
+      console.error('Error saving recent search:', error)
+    }
+  }
+
+  // Clear recent searches
+  const clearRecentSearches = async () => {
+    try {
+      await AsyncStorage.removeItem('recentSearches')
+      setRecentSearches([])
+    } catch (error) {
+      console.error('Error clearing recent searches:', error)
+    }
+  }
+
   // Apply filters to results
   const applyFilters = useCallback((results: SearchResult[]) => {
     let filtered = [...results]
@@ -325,7 +397,12 @@ const Search = () => {
           item.destination?.toLowerCase().includes(searchText.replace('ة', 'ه')) ||
           item.destination?.toLowerCase().includes(searchText.replace('ه', 'ة'))
         const nameMatch = item.name?.toLowerCase().includes(searchText)
-        return originMatch || destMatch || nameMatch
+        const waypointsMatch = item.waypoints?.some(waypoint => 
+          waypoint.address.toLowerCase().includes(searchText) ||
+          waypoint.address.toLowerCase().includes(searchText.replace('ة', 'ه')) ||
+          waypoint.address.toLowerCase().includes(searchText.replace('ه', 'ة'))
+        )
+        return originMatch || destMatch || nameMatch || waypointsMatch
       })
     }
 
@@ -475,19 +552,29 @@ const Search = () => {
   const handleSearch = useCallback(async (text: string) => {
     setSearchQuery(text)
     if (!text.trim()) {
-      // When search is cleared, show all results
+      setShowRecentSearches(true)
       const filteredResults = applyFilters(allResults)
       setDisplayedResults(filteredResults.slice(0, RIDES_PER_PAGE))
       setCurrentIndex(RIDES_PER_PAGE)
       setHasMore(filteredResults.length > RIDES_PER_PAGE)
       return
     }
+
+    // Save search after 2 seconds of inactivity
+    if (recentSearchesTimeout.current) {
+      clearTimeout(recentSearchesTimeout.current)
+    }
+    recentSearchesTimeout.current = setTimeout(() => {
+      saveRecentSearch(text)
+    }, 2000)
+
     setLoading(true)
     try {
       const filteredResults = applyFilters(allResults)
       setDisplayedResults(filteredResults.slice(0, RIDES_PER_PAGE))
       setCurrentIndex(RIDES_PER_PAGE)
       setHasMore(filteredResults.length > RIDES_PER_PAGE)
+      setShowRecentSearches(false)
     } catch (error) {
       setDisplayedResults([])
       setHasMore(false)
@@ -924,23 +1011,33 @@ const Search = () => {
                         <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} ${language === 'ar' ? 'ml-2' : 'mr-2'}`}>
                           {language === 'ar' ? 'نقاط التوقف' : 'Waypoints'}:
                         </Text>
+                        {/* Display single waypoint beside label if only one */}
+                        {item.waypoints.length === 1 && (
+                           <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`} numberOfLines={1}>
+                              {item.waypoints[0].address}
+                           </Text>
+                        )}
                       </View>
-                    <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                      {item.waypoints.map((waypoint, index) => (
-                        <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                            {waypoint.address}
-                          </Text>
-                          {index < item.waypoints!.length - 1 && (
-                            <View className={`mx-1 ${language === 'ar' ? 'transform rotate-180' : ''}`}>
-                              <MaterialIcons name="arrow-forward" size={18} color="#F79824" />
-                            </View>
-                          )}
-                        </View>
-                      ))}
-                    </View>
+                    {/* List waypoints below label if more than one */}
+                    {item.waypoints.length > 1 && (
+                      <View className={`flex-row flex-wrap ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {item.waypoints.map((waypoint, index) => (
+                          <View key={index} className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+                            <Text className={`text-base ${language === 'ar' ? 'font-CairoMedium' : 'font-CairoMedium'} ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                              {waypoint.address}
+                            </Text>
+                            {index < item.waypoints!.length - 1 && (
+                              <View className={`mx-1 ${language === 'ar' ? 'transform rotate-180' : ''}`}>
+                                <MaterialIcons name="arrow-forward" size={18} color="#F79824" />
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 )}
+
 
                 <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <Image source={icons.target} resizeMode="contain" className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
@@ -1157,17 +1254,63 @@ const Search = () => {
     )
   }
 
+  // Render recent searches
+  const renderRecentSearches = () => {
+    if (!showRecentSearches || recentSearches.length === 0) return null
+
+    return (
+      <View className="bg-white rounded-xl p-4 mb-4">
+        <View className={`flex-row justify-between items-center mb-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <Text className={`text-base ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-800`}>
+            {language === 'ar' ? 'البحث الأخير' : 'Recent Searches'}
+          </Text>
+          <TouchableOpacity onPress={clearRecentSearches}>
+            <Text className={`text-sm ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-red-500`}>
+              {language === 'ar' ? 'مسح الكل' : 'Clear All'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {recentSearches.map((search, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => {
+              setSearchQuery(search)
+              handleSearch(search)
+            }}
+            className={`flex-row items-center py-3 ${index !== recentSearches.length - 1 ? 'border-b border-gray-100' : ''}`}
+          >
+            <Image source={icons.history} className={`w-5 h-5 ${language === 'ar' ? 'ml-3 mr-2' : 'mr-3 ml-2'}`} tintColor="#6B7280" />
+            <Text className={`flex-1 ${language === 'ar' ? 'font-CairoMedium' : 'font-JakartaMedium'} text-gray-700`}>
+              {search}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                const updatedSearches = recentSearches.filter((_, i) => i !== index)
+                setRecentSearches(updatedSearches)
+                AsyncStorage.setItem('recentSearches', JSON.stringify(updatedSearches))
+              }}
+            >
+              <Image source={icons.close} className="w-4 h-4" tintColor="#6B7280" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
+      </View>
+    )
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Header profileImageUrl={profileImageUrl} title={t.Search} />
       <View className="px-4 py-3 bg-white border-b border-gray-100">
         <View className={`flex-row items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-          <View className="flex-1 flex-row items-center bg-gray-50 rounded-full px-4 py-2">
-            <Image source={icons.search} className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} tintColor="#6B7280" />
+         <View className="flex-1 flex-row items-center bg-gray-50 rounded-full px-4 py-2"
+          style={Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow}>
+          <Image source={icons.search} className={`w-5 h-5 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} tintColor="#6B7280" />
             <TextInput
               placeholder={language === 'ar' ? 'ابحث عن رحلات' : 'Search for rides'}
               value={searchQuery}
               onChangeText={handleSearchInput}
+              onFocus={() => setShowRecentSearches(true)}
               className={`flex-1 ${language === 'ar' ? 'text-right' : 'text-left'} ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-gray-700`}
               placeholderTextColor="#9CA3AF"
               autoFocus={true}
@@ -1179,7 +1322,8 @@ const Search = () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
               setShowFilters(true)
             }}
-            className={`bg-gray-50 p-2 rounded-full ${language === 'ar' ? 'ml-2' : 'mr-2'}`}
+            className={`bg-gray-50  px-3 py-3 rounded-full ${language === 'ar' ? ' mr-1' : 'ml-1'}`}
+            style={Platform.OS === 'android' ? styles.androidShadow1 : styles.iosShadow1}
           >
             <Image source={icons.filter} className="w-6 h-6" tintColor="#6B7280" />
           </TouchableOpacity>
@@ -1204,6 +1348,7 @@ const Search = () => {
       </View>
 
       <View className="flex-1 px-4">
+        {renderRecentSearches()}
         {loading ? (
           <View className="flex-1 py-8">
             {[1, 2, 3].map((_, index) => (
