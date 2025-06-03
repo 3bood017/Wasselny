@@ -167,6 +167,7 @@ export interface TranslationKeys {
   Active: string;
   Inactive: string;
   TotalRides: string;
+  TotalRating: string;
   Rating: string;
   BecomeDriver: string;
   EarnMoney: string;
@@ -565,6 +566,7 @@ export const translations: Translations = {
     Active: 'نشط',
     Inactive: 'غير نشط',
     TotalRides: 'إجمالي الرحلات',
+    TotalRating: ' إجمالي التقييمات',
     Rating: 'التقييم',
     BecomeDriver: 'كن سائقًا',
     EarnMoney: 'اربح المال من خلال تقديم الرحلات',
@@ -939,6 +941,7 @@ export const translations: Translations = {
     Active: "Active",
     Inactive: "Inactive",
     TotalRides: "Total Rides",
+    TotalRating: " Total Rating",
     Rating: "Rating",
     BecomeDriver: "Become a Driver",
     EarnMoney: "Earn money by providing rides",

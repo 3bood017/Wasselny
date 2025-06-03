@@ -283,7 +283,7 @@ const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProp
             animated: true
           });
         }
-      }, 5000);
+      }, 3000);
 
       return () => clearInterval(interval);
     }
@@ -294,7 +294,7 @@ const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProp
     // Reset the flag after 4 seconds of no scrolling
     setTimeout(() => {
       setIsUserScrolling(false);
-    }, 5000);
+    }, 2000);
   };
 
   const formatTimeTo12Hour = (timeStr: string) => {
