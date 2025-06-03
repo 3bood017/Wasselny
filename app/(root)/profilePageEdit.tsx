@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/clerk-expo";
-import { Image, ScrollView, Text, View, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput, Switch, Share, Platform, Linking } from "react-native";
+import { Image, ScrollView, Text, View, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput, Switch, Share, Platform, Linking, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from '@/context/LanguageContext';
 import { AntDesign, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -26,6 +26,147 @@ interface UserData {
   profile_image_url?: string;
   role?: string;
 }
+
+interface CustomAlertProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel?: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  type?: 'success' | 'error' | 'warning' | 'info';
+}
+
+const CustomAlert = ({
+  visible,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = 'OK',
+  cancelText = 'Cancel',
+  type = 'info'
+}: CustomAlertProps) => {
+  const scaleAnim = React.useRef(new Animated.Value(0)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 7
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true
+        })
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 7
+        })
+      ]).start();
+    }
+  }, [visible]);
+
+  const getTypeStyles = () => {
+    switch (type) {
+      case 'success':
+        return {
+          icon: 'check-circle',
+          color: '#22c55e',
+          bgColor: '#dcfce7'
+        };
+      case 'error':
+        return {
+          icon: 'error',
+          color: '#ef4444',
+          bgColor: '#fee2e2'
+        };
+      case 'warning':
+        return {
+          icon: 'warning',
+          color: '#f97316',
+          bgColor: '#ffedd5'
+        };
+      default:
+        return {
+          icon: 'info',
+          color: '#3b82f6',
+          bgColor: '#dbeafe'
+        };
+    }
+  };
+
+  const typeStyles = getTypeStyles();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onCancel}
+    >
+      <View className="flex-1 justify-center items-center bg-black/50">
+        <Animated.View
+          className="w-[85%] bg-white rounded-2xl overflow-hidden"
+          style={[
+            { transform: [{ scale: scaleAnim }] },
+            { opacity: opacityAnim }
+          ]}
+        >
+          <View className={`p-6 ${typeStyles.bgColor}`}>
+            <View className="items-center mb-4">
+              <MaterialIcons name={typeStyles.icon as any} size={48} color={typeStyles.color} />
+            </View>
+            <Text className="text-xl font-CairoBold text-gray-800 text-center mb-2">
+              {title}
+            </Text>
+            <Text className="text-base text-gray-600 text-center font-CairoRegular">
+              {message}
+            </Text>
+          </View>
+
+          <View className="flex-row border-t border-gray-200">
+            {onCancel && (
+              <TouchableOpacity
+                onPress={onCancel}
+                className="flex-1 py-4 border-r border-gray-200"
+              >
+                <Text className="text-base text-gray-600 text-center font-CairoMedium">
+                  {cancelText}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={onConfirm}
+              className={`py-4 ${onCancel ? 'flex-1' : 'w-full'}`}
+              style={{ backgroundColor: typeStyles.color }}
+            >
+              <Text className="text-base text-white text-center font-CairoMedium">
+                {confirmText}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
 
 const ProfileEdit = () => {
   const { user } = useUser();
@@ -85,6 +226,17 @@ const ProfileEdit = () => {
   const [newCarType, setNewCarType] = useState('');
   const [newCarSeats, setNewCarSeats] = useState('');
   const [isUpdatingCar, setIsUpdatingCar] = useState(false);
+
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+    onConfirm: () => {},
+    confirmText: undefined as string | undefined,
+    onCancel: undefined as (() => void) | undefined,
+    cancelText: undefined as string | undefined,
+  });
 
   const fetchUserData = async (isMounted = true) => {
     if (!user?.id) {
@@ -177,67 +329,64 @@ const ProfileEdit = () => {
       
       if (existingStatus === 'granted') {
         // If notifications are already enabled, show turn off confirmation
-        Alert.alert(
-          language === 'ar' ? 'تعطيل الإشعارات' : 'Disable Notifications',
-          language === 'ar' 
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'تعطيل الإشعارات' : 'Disable Notifications',
+          message: language === 'ar' 
             ? 'هل أنت متأكد أنك تريد تعطيل الإشعارات؟' 
             : 'Are you sure you want to disable notifications?',
-          [
-            {
-              text: language === 'ar' ? 'إلغاء' : 'Cancel',
-              style: 'cancel',
-            },
-            {
-              text: language === 'ar' ? 'تعطيل' : 'Disable',
-              onPress: () => {
-                setNotificationsEnabled(false);
-                // Open app settings to let user disable notifications
-                Linking.openSettings();
-              },
-              style: 'destructive',
-            },
-          ]
-        );
+          type: 'warning',
+          onConfirm: () => {
+            setAlertConfig({ ...alertConfig, visible: false });
+            Linking.openSettings();
+          },
+          confirmText: language === 'ar' ? 'تعطيل' : 'Disable',
+          onCancel: () => setAlertConfig({ ...alertConfig, visible: false }),
+          cancelText: language === 'ar' ? 'إلغاء' : 'Cancel',
+        });
       } else {
         // If notifications are disabled, show enable prompt
-        Alert.alert(
-          language === 'ar' ? 'تفعيل الإشعارات' : 'Enable Notifications',
-          language === 'ar' 
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'تفعيل الإشعارات' : 'Enable Notifications',
+          message: language === 'ar' 
             ? 'هل تريد تلقي إشعارات لتتبع رحلاتك وتحديثاتها؟' 
             : 'Would you like to receive notifications to track your rides and updates?',
-          [
-            {
-              text: language === 'ar' ? 'لا تسمح' : "Don't Allow",
-              style: 'cancel',
-            },
-            {
-              text: language === 'ar' ? 'السماح' : 'Allow',
-              onPress: async () => {
-                const { status } = await Notifications.requestPermissionsAsync();
-                if (status === 'granted') {
-                  setNotificationsEnabled(true);
-                  // Register for push notifications here
-                  const token = await Notifications.getExpoPushTokenAsync({
-                    projectId: 'your-project-id' // Replace with your Expo project ID
-                  });
-                  console.log('Expo push token:', token);
-                  // Here you would typically send this token to your backend
-                } else {
-                  setNotificationsEnabled(false);
-                }
-              },
-            },
-          ]
-        );
+          type: 'info',
+          onConfirm: async () => {
+            setAlertConfig({ ...alertConfig, visible: false });
+            const { status } = await Notifications.requestPermissionsAsync();
+            if (status === 'granted') {
+              setNotificationsEnabled(true);
+              // Register for push notifications here
+              const token = await Notifications.getExpoPushTokenAsync({
+                projectId: 'your-project-id' // Replace with your Expo project ID
+              });
+              console.log('Expo push token:', token);
+              // Here you would typically send this token to your backend
+            } else {
+              setNotificationsEnabled(false);
+            }
+          },
+          confirmText: language === 'ar' ? 'السماح' : 'Allow',
+          onCancel: () => setAlertConfig({ ...alertConfig, visible: false }),
+          cancelText: language === 'ar' ? 'لا تسمح' : "Don't Allow",
+        });
       }
     } catch (error) {
       console.log('Error toggling notifications:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' 
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' 
           ? 'حدث خطأ أثناء تحديث إعدادات الإشعارات' 
-          : 'There was an error updating notification settings'
-      );
+          : 'There was an error updating notification settings',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
     }
   };
 
@@ -258,10 +407,16 @@ const ProfileEdit = () => {
 
       if (field === 'carType') {
         if (!editValue.trim()) {
-          Alert.alert(
-            language === 'ar' ? 'خطأ' : 'Error',
-            language === 'ar' ? 'يرجى إدخال نوع السيارة' : 'Please enter car type'
-          );
+          setAlertConfig({
+            visible: true,
+            title: language === 'ar' ? 'خطأ' : 'Error',
+            message: language === 'ar' ? 'يرجى إدخال نوع السيارة' : 'Please enter car type',
+            type: 'error',
+            onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+            confirmText: language === 'ar' ? 'حسناً' : 'OK',
+            onCancel: undefined,
+            cancelText: undefined
+          });
           return;
         }
         await updateDoc(userRef, { 'driver.car_type': editValue.trim() });
@@ -282,10 +437,16 @@ const ProfileEdit = () => {
       } else if (field === 'carSeats') {
         const seats = parseInt(editValue, 10);
         if (isNaN(seats) || seats < 1 || seats > 10) {
-          Alert.alert(
-            language === 'ar' ? 'خطأ' : 'Error',
-            language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح (1-10)' : 'Please enter a valid number of seats (1-10)'
-          );
+          setAlertConfig({
+            visible: true,
+            title: language === 'ar' ? 'خطأ' : 'Error',
+            message: language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح (1-10)' : 'Please enter a valid number of seats (1-10)',
+            type: 'error',
+            onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+            confirmText: language === 'ar' ? 'حسناً' : 'OK',
+            onCancel: undefined,
+            cancelText: undefined
+          });
           return;
         }
         await updateDoc(userRef, { 'driver.car_seats': seats });
@@ -304,13 +465,18 @@ const ProfileEdit = () => {
           };
         });
       } else if (field === 'phoneNumber') {
-        // Basic phone number validation
         const phoneRegex = /^\+?[0-9]{10,15}$/;
         if (!phoneRegex.test(editValue.trim())) {
-          Alert.alert(
-            language === 'ar' ? 'خطأ' : 'Error',
-            language === 'ar' ? 'يرجى إدخال رقم هاتف صالح' : 'Please enter a valid phone number'
-          );
+          setAlertConfig({
+            visible: true,
+            title: language === 'ar' ? 'خطأ' : 'Error',
+            message: language === 'ar' ? 'يرجى إدخال رقم هاتف صالح' : 'Please enter a valid phone number',
+            type: 'error',
+            onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+            confirmText: language === 'ar' ? 'حسناً' : 'OK',
+            onCancel: undefined,
+            cancelText: undefined
+          });
           return;
         }
 
@@ -330,17 +496,23 @@ const ProfileEdit = () => {
           setEditValues(prev => ({ ...prev, phoneNumber: editValue.trim() }));
           
           // Show success message
-          Alert.alert(
-            language === 'ar' ? 'نجاح' : 'Success',
-            language === 'ar' ? 'تم تحديث رقم الهاتف بنجاح' : 'Phone number updated successfully'
-          );
+          setAlertConfig({
+            visible: true,
+            title: language === 'ar' ? 'نجاح' : 'Success',
+            message: language === 'ar' ? 'تم تحديث رقم الهاتف بنجاح' : 'Phone number updated successfully',
+            type: 'success',
+            onConfirm: () => {
+              setAlertConfig({ ...alertConfig, visible: false });
+              setEditModalVisible(false);
+              setEditingField(null);
+            },
+            confirmText: language === 'ar' ? 'حسناً' : 'OK',
+            onCancel: undefined,
+            cancelText: undefined
+          });
           
           // Trigger haptic feedback
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          
-          // Close modal and reset state
-          setEditModalVisible(false);
-          setEditingField(null);
           
           return; // Exit early since we've handled the success case
         } catch (error) {
@@ -350,23 +522,35 @@ const ProfileEdit = () => {
       }
 
       // Show success message for other fields
-      Alert.alert(
-        language === 'ar' ? 'نجاح' : 'Success',
-        language === 'ar' ? 'تم تحديث المعلومات بنجاح' : 'Information updated successfully'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'نجاح' : 'Success',
+        message: language === 'ar' ? 'تم تحديث المعلومات بنجاح' : 'Information updated successfully',
+        type: 'success',
+        onConfirm: () => {
+          setAlertConfig({ ...alertConfig, visible: false });
+          setEditModalVisible(false);
+          setEditingField(null);
+        },
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       
       // Trigger haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Close modal and reset state
-      setEditModalVisible(false);
-      setEditingField(null);
     } catch (error) {
       console.error(`Error updating ${editingField}:`, error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث المعلومات' : 'Error updating information'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'حدث خطأ أثناء تحديث المعلومات' : 'Error updating information',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       // Trigger error haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
@@ -376,10 +560,19 @@ const ProfileEdit = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
-          language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.'
-        );
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
+          message: language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.',
+          type: 'error',
+          onConfirm: () => {
+            setAlertConfig({ ...alertConfig, visible: false });
+            Linking.openSettings();
+          },
+          confirmText: language === 'ar' ? 'إعدادات' : 'Settings',
+          onCancel: () => setAlertConfig({ ...alertConfig, visible: false }),
+          cancelText: language === 'ar' ? 'إلغاء' : 'Cancel'
+        });
         return;
       }
 
@@ -398,16 +591,22 @@ const ProfileEdit = () => {
       // Validate file type
       const fileExtension = asset.uri.split('.').pop()?.toLowerCase();
       if (!['jpg', 'jpeg', 'png'].includes(fileExtension || '')) {
-        Alert.alert(
-          language === 'ar' ? 'خطأ' : 'Error',
-          language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.'
-        );
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'خطأ' : 'Error',
+          message: language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.',
+          type: 'error',
+          onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+          confirmText: language === 'ar' ? 'حسناً' : 'OK',
+          onCancel: undefined,
+          cancelText: undefined
+        });
         return;
       }
 
       // Show temporary local image while uploading
       setUserData(prev => ({ ...prev, profileImage: asset.uri }));
-        setIsUploading(true);
+      setIsUploading(true);
 
       // Upload to Cloudinary first
       const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
@@ -462,20 +661,32 @@ const ProfileEdit = () => {
         // Refresh the profile image in the context
         await refreshProfileImage();
         
-        Alert.alert(
-          language === 'ar' ? 'نجاح' : 'Success',
-          language === 'ar' ? 'تم تحديث صورة البروفايل بنجاح' : 'Profile picture updated successfully'
-        );
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'نجاح' : 'Success',
+          message: language === 'ar' ? 'تم تحديث صورة البروفايل بنجاح' : 'Profile picture updated successfully',
+          type: 'success',
+          onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+          confirmText: language === 'ar' ? 'حسناً' : 'OK',
+          onCancel: undefined,
+          cancelText: undefined
+        });
 
         // Trigger haptic feedback
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
       console.error('Profile image upload error:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث صورة البروفايل' : 'Error updating profile picture'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'حدث خطأ أثناء تحديث صورة البروفايل' : 'Error updating profile picture',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       // Revert to previous image if available
       setUserData(prev => ({ ...prev, profileImage: user?.imageUrl || null }));
     } finally {
@@ -487,10 +698,19 @@ const ProfileEdit = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
-          language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.'
-        );
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'تم رفض الإذن' : 'Permission Denied',
+          message: language === 'ar' ? 'يجب منح إذن للوصول إلى مكتبة الصور' : 'You need to grant permission to access media library.',
+          type: 'error',
+          onConfirm: () => {
+            setAlertConfig({ ...alertConfig, visible: false });
+            Linking.openSettings();
+          },
+          confirmText: language === 'ar' ? 'إعدادات' : 'Settings',
+          onCancel: () => setAlertConfig({ ...alertConfig, visible: false }),
+          cancelText: language === 'ar' ? 'إلغاء' : 'Cancel'
+        });
         return;
       }
 
@@ -509,14 +729,20 @@ const ProfileEdit = () => {
       // Validate file type
       const fileExtension = asset.uri.split('.').pop()?.toLowerCase();
       if (!['jpg', 'jpeg', 'png'].includes(fileExtension || '')) {
-        Alert.alert(
-          language === 'ar' ? 'خطأ' : 'Error',
-          language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.'
-        );
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'خطأ' : 'Error',
+          message: language === 'ar' ? 'يجب اختيار صورة بصيغة JPG أو PNG' : 'Please select a JPG or PNG image.',
+          type: 'error',
+          onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+          confirmText: language === 'ar' ? 'حسناً' : 'OK',
+          onCancel: undefined,
+          cancelText: undefined
+        });
         return;
       }
 
-        setIsUploading(true);
+      setIsUploading(true);
 
       // Upload to Cloudinary
       const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
@@ -551,20 +777,32 @@ const ProfileEdit = () => {
           };
         });
 
-        Alert.alert(
-          language === 'ar' ? 'نجاح' : 'Success',
-          language === 'ar' ? 'تم تحديث صورة السيارة بنجاح' : 'Car image updated successfully'
-        );
+        setAlertConfig({
+          visible: true,
+          title: language === 'ar' ? 'نجاح' : 'Success',
+          message: language === 'ar' ? 'تم تحديث صورة السيارة بنجاح' : 'Car image updated successfully',
+          type: 'success',
+          onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+          confirmText: language === 'ar' ? 'حسناً' : 'OK',
+          onCancel: undefined,
+          cancelText: undefined
+        });
 
         // Trigger haptic feedback
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
       console.error('Car image upload error:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث صورة السيارة' : 'Error updating car image'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'حدث خطأ أثناء تحديث صورة السيارة' : 'Failed to update car image',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
     } finally {
       setIsUploading(false);
     }
@@ -572,26 +810,44 @@ const ProfileEdit = () => {
 
   const handleChangePassword = async () => {
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'يرجى ملء جميع الحقول' : 'Please fill in all fields'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'يرجى ملء جميع الحقول' : 'Please fill in all fields',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'كلمات المرور الجديدة غير متطابقة' : 'New passwords do not match'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'كلمات المرور الجديدة غير متطابقة' : 'New passwords do not match',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       return;
     }
 
     if (passwordData.newPassword.length < 8) {
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل' : 'New password must be at least 8 characters'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'يجب أن تكون كلمة المرور الجديدة 8 أحرف على الأقل' : 'New password must be at least 8 characters',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       return;
     }
 
@@ -611,10 +867,16 @@ const ProfileEdit = () => {
       setShowChangePassword(false);
 
       // Show success message
-      Alert.alert(
-        language === 'ar' ? 'نجاح' : 'Success',
-        language === 'ar' ? 'تم تغيير كلمة المرور بنجاح' : 'Password changed successfully'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'نجاح' : 'Success',
+        message: language === 'ar' ? 'تم تغيير كلمة المرور بنجاح' : 'Password changed successfully',
+        type: 'success',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
 
       // Trigger haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -626,10 +888,16 @@ const ProfileEdit = () => {
         errorMessage = language === 'ar' ? 'كلمة المرور الحالية غير صحيحة' : 'Current password is incorrect';
       }
       
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        errorMessage
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: errorMessage,
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
     } finally {
       setIsChangingPassword(false);
     }
@@ -645,12 +913,18 @@ const ProfileEdit = () => {
     // Validate phone number format
     const phoneRegex = /^\+972[0-9]{9}$/;
     if (!phoneRegex.test(formattedNumber)) {
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' 
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' 
           ? 'يرجى إدخال رقم هاتف صالح (9 أرقام بعد +972)' 
-          : 'Please enter a valid phone number (9 digits after +972)'
-      );
+          : 'Please enter a valid phone number (9 digits after +972)',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       return;
     }
 
@@ -673,23 +947,35 @@ const ProfileEdit = () => {
       setEditValues(prev => ({ ...prev, phoneNumber: formattedNumber }));
       
       // Show success message
-      Alert.alert(
-        language === 'ar' ? 'نجاح' : 'Success',
-        language === 'ar' ? 'تم تحديث رقم الهاتف بنجاح' : 'Phone number updated successfully'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'نجاح' : 'Success',
+        message: language === 'ar' ? 'تم تحديث رقم الهاتف بنجاح' : 'Phone number updated successfully',
+        type: 'success',
+        onConfirm: () => {
+          setAlertConfig({ ...alertConfig, visible: false });
+          setShowPhoneModal(false);
+          setNewPhoneNumber('');
+        },
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       
       // Trigger haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Close modal and reset state
-      setShowPhoneModal(false);
-      setNewPhoneNumber('');
     } catch (error) {
       console.error('Error updating phone number:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث رقم الهاتف' : 'Error updating phone number'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'حدث خطأ أثناء تحديث رقم الهاتف' : 'Error updating phone number',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsUpdatingPhone(false);
@@ -701,10 +987,16 @@ const ProfileEdit = () => {
     if (!user?.id) return;
 
     if (!newCarType.trim()) {
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'يرجى إدخال نوع السيارة' : 'Please enter car type'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'يرجى إدخال نوع السيارة' : 'Please enter car type',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       return;
     }
 
@@ -732,23 +1024,35 @@ const ProfileEdit = () => {
       });
       
       // Show success message
-      Alert.alert(
-        language === 'ar' ? 'نجاح' : 'Success',
-        language === 'ar' ? 'تم تحديث نوع السيارة بنجاح' : 'Car type updated successfully'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'نجاح' : 'Success',
+        message: language === 'ar' ? 'تم تحديث نوع السيارة بنجاح' : 'Car type updated successfully',
+        type: 'success',
+        onConfirm: () => {
+          setAlertConfig({ ...alertConfig, visible: false });
+          setShowCarTypeModal(false);
+          setNewCarType('');
+        },
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       
       // Trigger haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Close modal and reset state
-      setShowCarTypeModal(false);
-      setNewCarType('');
     } catch (error) {
       console.error('Error updating car type:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث نوع السيارة' : 'Error updating car type'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'حدث خطأ أثناء تحديث نوع السيارة' : 'Failed to update car type',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsUpdatingCar(false);
@@ -761,10 +1065,16 @@ const ProfileEdit = () => {
 
     const seats = parseInt(newCarSeats, 10);
     if (isNaN(seats) || seats < 1 || seats > 10) {
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح (1-10)' : 'Please enter a valid number of seats (1-10)'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'يرجى إدخال عدد مقاعد صالح (1-10)' : 'Please enter a valid number of seats (1-10)',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       return;
     }
 
@@ -792,23 +1102,35 @@ const ProfileEdit = () => {
       });
       
       // Show success message
-      Alert.alert(
-        language === 'ar' ? 'نجاح' : 'Success',
-        language === 'ar' ? 'تم تحديث عدد المقاعد بنجاح' : 'Car seats updated successfully'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'نجاح' : 'Success',
+        message: language === 'ar' ? 'تم تحديث عدد المقاعد بنجاح' : 'Car seats updated successfully',
+        type: 'success',
+        onConfirm: () => {
+          setAlertConfig({ ...alertConfig, visible: false });
+          setShowCarSeatsModal(false);
+          setNewCarSeats('');
+        },
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       
       // Trigger haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Close modal and reset state
-      setShowCarSeatsModal(false);
-      setNewCarSeats('');
     } catch (error) {
       console.error('Error updating car seats:', error);
-      Alert.alert(
-        language === 'ar' ? 'خطأ' : 'Error',
-        language === 'ar' ? 'حدث خطأ أثناء تحديث عدد المقاعد' : 'Error updating car seats'
-      );
+      setAlertConfig({
+        visible: true,
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        message: language === 'ar' ? 'حدث خطأ أثناء تحديث عدد المقاعد' : 'Error updating car seats',
+        type: 'error',
+        onConfirm: () => setAlertConfig({ ...alertConfig, visible: false }),
+        confirmText: language === 'ar' ? 'حسناً' : 'OK',
+        onCancel: undefined,
+        cancelText: undefined
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsUpdatingCar(false);
@@ -822,7 +1144,7 @@ const ProfileEdit = () => {
           headerTitle: language === 'ar' ? 'تعديل الملف' : 'Profile Edit',
           headerTitleStyle: {
             fontSize: 18,
-            fontFamily: language === 'ar' ? 'Cairo-Bold' : 'PlusJakartaSans-Bold',
+            fontFamily: 'Cairo-Bold',
           },
           headerTitleAlign: 'center',
         }} 
@@ -888,14 +1210,14 @@ const ProfileEdit = () => {
           </View>
 
           {/* Form Fields */}
-          <View className="mt-8 space-y-6">
+          <View className="mt-6 space-y-6">
             {/* Full Name */}
             <View>
-              <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-gray-500 text-[13px] mb-1 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
               </Text>
               <View className="bg-white py-3 px-3 border border-gray-200 rounded-md">
-                <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-[15px] text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {user?.fullName || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                 </Text>
               </View>
@@ -903,26 +1225,26 @@ const ProfileEdit = () => {
 
             {/* Email */}
             <View>
-              <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-gray-500 text-[13px] mb-1 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
               </Text>
               <View className="bg-white py-3 px-3 border border-gray-200 rounded-md">
-                <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-[15px] text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {user?.primaryEmailAddress?.emailAddress || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                 </Text>
               </View>
             </View>
 
             {/* Driver Information Section */}
-            {userData.isDriver ? (
+            {userData.isDriver && (
               <>
                 {/* Car Type */}
                 <View>
-                  <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  <Text className={`text-gray-500 text-[13px] mb-1 mt-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {language === 'ar' ? 'نوع السيارة' : 'Car Type'}
                   </Text>
                   <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                    <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    <Text className={`text-[15px] text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                       {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                     </Text>
                     <TouchableOpacity onPress={() => setShowCarTypeModal(true)}>
@@ -933,11 +1255,11 @@ const ProfileEdit = () => {
 
                 {/* Car Seats */}
                 <View>
-                  <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                  <Text className={`text-gray-500 text-[13px] mb-1 mt-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                     {language === 'ar' ? 'عدد المقاعد' : 'Car Seats'}
                   </Text>
                   <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                    <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                    <Text className={`text-[15px] text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                       {userData.data?.driver?.car_seats || '0'}
                     </Text>
                     <TouchableOpacity onPress={() => setShowCarSeatsModal(true)}>
@@ -946,32 +1268,15 @@ const ProfileEdit = () => {
                   </View>
                 </View>
               </>
-            ) : (
-              <TouchableOpacity
-                onPress={() => router.push('/(root)/driverInfo')}
-                className="bg-orange-50 rounded-xl p-4"
-              >
-                <View className={`flex-row items-center justify-between ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                  <View className={`flex-1 ${language === 'ar' ? 'items-end' : 'items-start'}`}>
-                    <Text className={`text-lg ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-orange-500`}>
-                      {language === 'ar' ? 'كن سائقاً' : 'Become a Driver'}
-                    </Text>
-                    <Text className={`text-sm text-gray-500 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                      {language === 'ar' ? 'اكسب المال من خلال تقديم الرحلات' : 'Earn money by giving rides'}
-                    </Text>
-                  </View>
-                  <MaterialIcons name="arrow-forward-ios" size={20} color="#F97316" />
-                </View>
-              </TouchableOpacity>
             )}
 
             {/* Phone Number */}
             <View>
-              <Text className={`text-gray-500 text-[13px] mb-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-gray-500 text-[13px] mb-1 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
               </Text>
               <View className={`bg-white py-3 px-3 border border-gray-200 rounded-md flex-row justify-between items-center ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                <Text className={`text-[15px] text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-[15px] text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {phoneNumber}
                 </Text>
                 <TouchableOpacity onPress={() => setShowPhoneModal(true)}>
@@ -988,7 +1293,7 @@ const ProfileEdit = () => {
               <View className={`w-9 h-9 rounded-full bg-orange-500 items-center justify-center ${language === 'ar' ? 'ml-3.5' : 'mr-3.5'}`}>
                 <MaterialIcons name="lock" size={22} color="#fff" />
               </View>
-              <Text className={`text-base font-bold text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-base font-CairoBold text-gray-800 mt-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}
               </Text>
             </TouchableOpacity>
@@ -1004,7 +1309,7 @@ const ProfileEdit = () => {
         >
           <View className="flex-1 bg-black/50 justify-center items-center p-4">
             <View className="bg-white rounded-2xl w-full max-w-sm p-6">
-              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-lg font-CairoBold mb-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {editingField === 'carType' 
                   ? (language === 'ar' ? 'تعديل نوع السيارة' : 'Edit Car Type')
                   : editingField === 'carSeats'
@@ -1014,7 +1319,7 @@ const ProfileEdit = () => {
               <TextInput
                 value={editValue}
                 onChangeText={setEditValue}
-                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={
                   editingField === 'carType'
                     ? (language === 'ar' ? 'أدخل نوع السيارة' : 'Enter car type')
@@ -1034,7 +1339,7 @@ const ProfileEdit = () => {
                   }}
                   className="px-4 py-2 rounded-lg"
                 >
-                  <Text className="text-gray-600">
+                  <Text className="text-gray-600 font-CairoMedium">
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </Text>
                 </TouchableOpacity>
@@ -1042,7 +1347,7 @@ const ProfileEdit = () => {
                   onPress={handleSaveEdit}
                   className="bg-orange-500 px-4 py-2 rounded-lg"
                 >
-                  <Text className="text-white">
+                  <Text className="text-white font-CairoMedium">
                     {language === 'ar' ? 'حفظ' : 'Save'}
                   </Text>
                 </TouchableOpacity>
@@ -1060,28 +1365,31 @@ const ProfileEdit = () => {
         >
           <View className="flex-1 bg-black/50 justify-center items-center p-4">
             <View className="bg-white rounded-2xl w-full max-w-sm p-6">
-              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-lg font-CairoBold mb-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}
               </Text>
               <TextInput
                 value={passwordData.currentPassword}
                 onChangeText={(text) => setPasswordData(prev => ({ ...prev, currentPassword: text }))}
-                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={language === 'ar' ? 'كلمة المرور الحالية' : 'Current Password'}
+                placeholderTextColor="#9CA3AF"
                 secureTextEntry
               />
               <TextInput
                 value={passwordData.newPassword}
                 onChangeText={(text) => setPasswordData(prev => ({ ...prev, newPassword: text }))}
-                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={language === 'ar' ? 'كلمة المرور الجديدة' : 'New Password'}
+                placeholderTextColor="#9CA3AF"
                 secureTextEntry
               />
               <TextInput
                 value={passwordData.confirmPassword}
                 onChangeText={(text) => setPasswordData(prev => ({ ...prev, confirmPassword: text }))}
-                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={language === 'ar' ? 'تأكيد كلمة المرور الجديدة' : 'Confirm New Password'}
+                placeholderTextColor="#9CA3AF"
                 secureTextEntry
               />
               <View className="flex-row justify-end space-x-2">
@@ -1089,7 +1397,7 @@ const ProfileEdit = () => {
                   onPress={() => setShowChangePassword(false)}
                   className="px-4 py-2 rounded-lg"
                 >
-                  <Text className="text-gray-600">
+                  <Text className="text-gray-600 font-CairoMedium">
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </Text>
                 </TouchableOpacity>
@@ -1101,7 +1409,7 @@ const ProfileEdit = () => {
                   {isChangingPassword ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text className="text-white">
+                    <Text className="text-white font-CairoMedium">
                       {language === 'ar' ? 'حفظ' : 'Save'}
                     </Text>
                   )}
@@ -1120,26 +1428,26 @@ const ProfileEdit = () => {
         >
           <View className="flex-1 bg-black/50 justify-center items-center p-4">
             <View className="bg-white rounded-2xl w-full max-w-sm p-6">
-              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-lg font-CairoBold mb-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'تحديث رقم الهاتف' : 'Update Phone Number'}
               </Text>
               
               <View className="mb-4">
-                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-sm text-gray-500 mb-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' ? 'الرقم الحالي' : 'Current Number'}
                 </Text>
-                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-base text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {phoneNumber}
                 </Text>
               </View>
 
               <View className="mb-4">
-                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-sm text-gray-500 mb-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' ? 'رقم الهاتف الجديد' : 'New Phone Number'}
                 </Text>
                 <View className={`flex-row items-center bg-gray-50 rounded-xl overflow-hidden ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                   <View className="bg-gray-200 px-4 py-4">
-                    <Text className="text-gray-700 font-medium">+972</Text>
+                    <Text className="text-gray-700 font-CairoMedium">+972</Text>
                   </View>
                   <TextInput
                     value={newPhoneNumber}
@@ -1149,14 +1457,14 @@ const ProfileEdit = () => {
                       // Limit to 9 digits
                       setNewPhoneNumber(cleaned.slice(0, 9));
                     }}
-                    className={`flex-1 p-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                    className={`flex-1 p-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                     placeholder={language === 'ar' ? 'أدخل الرقم' : 'Enter number'}
                     keyboardType="number-pad"
                     maxLength={9}
                     autoFocus
                   />
                 </View>
-                <Text className={`text-xs text-gray-500 mt-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-xs text-gray-500 mt-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' 
                     ? 'أدخل 9 أرقام بعد +972' 
                     : 'Enter 9 digits after +972'}
@@ -1171,7 +1479,7 @@ const ProfileEdit = () => {
                   }}
                   className="px-4 py-2 rounded-lg"
                 >
-                  <Text className="text-gray-600">
+                  <Text className="text-gray-600 font-CairoMedium">
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </Text>
                 </TouchableOpacity>
@@ -1183,7 +1491,7 @@ const ProfileEdit = () => {
                   {isUpdatingPhone ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text className="text-white">
+                    <Text className="text-white font-CairoMedium">
                       {language === 'ar' ? 'حفظ' : 'Save'}
                     </Text>
                   )}
@@ -1202,15 +1510,15 @@ const ProfileEdit = () => {
         >
           <View className="flex-1 bg-black/50 justify-center items-center p-4">
             <View className="bg-white rounded-2xl w-full max-w-sm p-6">
-              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-lg font-CairoBold mb-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'تحديث نوع السيارة' : 'Update Car Type'}
               </Text>
               
               <View className="mb-4">
-                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-sm text-gray-500 mb-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' ? 'النوع الحالي' : 'Current Type'}
                 </Text>
-                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-base text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {userData.data?.driver?.car_type || (language === 'ar' ? 'غير محدد' : 'Not specified')}
                 </Text>
               </View>
@@ -1218,7 +1526,7 @@ const ProfileEdit = () => {
               <TextInput
                 value={newCarType}
                 onChangeText={setNewCarType}
-                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={language === 'ar' ? 'أدخل نوع السيارة الجديد' : 'Enter new car type'}
                 autoFocus
               />
@@ -1231,7 +1539,7 @@ const ProfileEdit = () => {
                   }}
                   className="px-4 py-2 rounded-lg"
                 >
-                  <Text className="text-gray-600">
+                  <Text className="text-gray-600 font-CairoMedium">
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </Text>
                 </TouchableOpacity>
@@ -1243,7 +1551,7 @@ const ProfileEdit = () => {
                   {isUpdatingCar ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text className="text-white">
+                    <Text className="text-white font-CairoMedium">
                       {language === 'ar' ? 'حفظ' : 'Save'}
                     </Text>
                   )}
@@ -1262,15 +1570,15 @@ const ProfileEdit = () => {
         >
           <View className="flex-1 bg-black/50 justify-center items-center p-4">
             <View className="bg-white rounded-2xl w-full max-w-sm p-6">
-              <Text className={`text-lg font-bold mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-lg font-CairoBold mb-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' ? 'تحديث عدد المقاعد' : 'Update Car Seats'}
               </Text>
               
               <View className="mb-4">
-                <Text className={`text-sm text-gray-500 mb-2 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-sm text-gray-500 mb-2 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' ? 'العدد الحالي' : 'Current Seats'}
                 </Text>
-                <Text className={`text-base text-gray-800 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <Text className={`text-base text-gray-800 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {userData.data?.driver?.car_seats || '0'}
                 </Text>
               </View>
@@ -1278,14 +1586,14 @@ const ProfileEdit = () => {
               <TextInput
                 value={newCarSeats}
                 onChangeText={setNewCarSeats}
-                className={`bg-gray-50 rounded-xl p-4 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}
+                className={`bg-gray-50 rounded-xl p-4 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}
                 placeholder={language === 'ar' ? 'أدخل عدد المقاعد الجديد' : 'Enter new number of seats'}
                 keyboardType="number-pad"
                 maxLength={2}
                 autoFocus
               />
 
-              <Text className={`text-xs text-gray-500 mb-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <Text className={`text-xs text-gray-500 mb-4 font-CairoRegular ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                 {language === 'ar' 
                   ? 'يجب أن يكون العدد بين 1 و 10' 
                   : 'Number must be between 1 and 10'}
@@ -1299,7 +1607,7 @@ const ProfileEdit = () => {
                   }}
                   className="px-4 py-2 rounded-lg"
                 >
-                  <Text className="text-gray-600">
+                  <Text className="text-gray-600 font-CairoMedium">
                     {language === 'ar' ? 'إلغاء' : 'Cancel'}
                   </Text>
                 </TouchableOpacity>
@@ -1311,7 +1619,7 @@ const ProfileEdit = () => {
                   {isUpdatingCar ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text className="text-white">
+                    <Text className="text-white font-CairoMedium">
                       {language === 'ar' ? 'حفظ' : 'Save'}
                     </Text>
                   )}
@@ -1320,6 +1628,18 @@ const ProfileEdit = () => {
             </View>
           </View>
         </Modal>
+
+        {/* Custom Alert */}
+        <CustomAlert
+          visible={alertConfig.visible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          onConfirm={alertConfig.onConfirm}
+          onCancel={alertConfig.onCancel}
+          confirmText={alertConfig.confirmText}
+          cancelText={alertConfig.cancelText}
+          type={alertConfig.type}
+        />
       </SafeAreaView>
     </>
   );
