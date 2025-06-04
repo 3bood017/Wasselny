@@ -347,6 +347,12 @@ export interface TranslationKeys {
   minutesAgo: string;
   minuteAgo: string;
   locationUpdatedSuccessfully: string;
+  incorrectPassword: string;
+  userNotFound: string;
+  identifierInvalid: string;
+  invalidCode: string;
+  emailTaken: string;
+  invalidEmailFormat: string;
 }
 
 export interface Translations {
@@ -436,7 +442,7 @@ export const translations: Translations = {
     signInFailed: "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
     welcome: "مرحبا بك!",
     forgotPasswordDescription: "أدخل بريدك الإلكتروني لإرسال رابط إعادة تعيين كلمة المرور.",
-    sendResetLink: "إرسال الرابط",
+    sendResetLink: "إرسال الرمز",
     backToSignIn: "العودة إلى تسجيل الدخول",
     fillEmailField: "يرجى إدخال البريد الإلكتروني.",
     resetPasswordLinkSent: "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني.",
@@ -728,6 +734,12 @@ export const translations: Translations = {
     minutesAgo: "دقائق مضت",
     minuteAgo: "دقيقة مضت",
     locationUpdatedSuccessfully: "تم تحديث الموقع بنجاح",
+    incorrectPassword: "كلمة السر غير صحيحة. حاول مرة أخرى.",
+    userNotFound: "لم يتم العثور على حساب بهذا البريد الإلكتروني.",
+    identifierInvalid: "البريد الإلكتروني غير صحيح.",
+    invalidCode: "رمز التحقق غير صحيح أو منتهي الصلاحية.",
+    emailTaken: "هذا البريد الإلكتروني مستخدم بالفعل. يرجى المحاولة ببريد آخر.",
+    invalidEmailFormat: "يجب أن يكون البريد الإلكتروني بصيغة صحيحة.",
   },
   en: {
     chooseLanguage: "Choose Language",
@@ -810,7 +822,7 @@ export const translations: Translations = {
     signInFailed: "Sign in failed. Please try again.",
     welcome: "Welcome!",
     forgotPasswordDescription: "Enter your email to receive a password reset link.",
-    sendResetLink: "Send Reset Link",
+    sendResetLink: "Send Reset Code",
     backToSignIn: "Back to Sign In",
     fillEmailField: "Please enter your email.",
     resetPasswordLinkSent: "A password reset link has been sent to your email.",
@@ -836,7 +848,7 @@ export const translations: Translations = {
     currentLocation: "Current Location",
     becomeDriver: "Become a Driver",
     earnMoney: "Earn money by providing rides",
-        register: "Register",
+    register: "Register",
     searchPlaceholder: "Where do you want to go?",
     searchError: "No results found",
     registerDriver: "Register as Driver",
@@ -1102,5 +1114,11 @@ export const translations: Translations = {
     minutesAgo: "minutes ago",
     minuteAgo: "minute ago",
     locationUpdatedSuccessfully: "Location updated successfully",
+    incorrectPassword: "Password is incorrect. Try again.",
+    userNotFound: "Couldn't find your account.",
+    identifierInvalid: "Identifier is invalid.",
+    invalidCode: "The verification code is invalid or expired.",
+    emailTaken: "That email address is taken. Please try another.",
+    invalidEmailFormat: "email_address must be a valid email address.",
   },
 };

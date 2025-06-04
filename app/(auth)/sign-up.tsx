@@ -156,13 +156,43 @@ const industryMap = new Map([
         state: 'pending',
       });
     } catch (err: any) {
+      setIsLoading(false);
       console.log(JSON.stringify(err, null, 2));
       console.error('Error during sign up:', err);
+
+      let errorMessageKey = t.signUpFailed; // Default to generic failed message
+
+      if (err.errors && err.errors.length > 0) {
+        const clerkErrorCode = err.errors[0].code;
+
+        switch (clerkErrorCode) {
+          case 'form_identifier_already_in_use':
+            errorMessageKey = t.emailTaken;
+            break;
+          // Add other specific Clerk error codes for sign up if known
+          default:
+            // Explicitly check for known English error messages from Clerk
+            if (err.errors[0].longMessage === 'That email address is taken. Please try another.') {
+              errorMessageKey = t.emailTaken;
+            } else if (err.errors[0].longMessage === 'email_address must be a valid email address.') {
+              errorMessageKey = t.invalidEmailFormat;
+            } else {
+              // Fallback to Clerk's long message or a generic translated message.
+              errorMessageKey = err.errors[0].longMessage || t.signUpFailed;
+            }
+            break;
+        }
+      }
+
       // Alert.alert(t.error, err.errors[0].longMessage);
-      setCustomErrorMessage(err.errors[0].longMessage);
+      setCustomErrorMessage(errorMessageKey);
       setShowCustomErrorModal(true);
     } finally {
-      setIsLoading(false);
+      // The isLoading state is set to false in the catch block already, and should also be here
+      // in the success case. However, be careful about setting it false too early before
+      // the verification step is fully processed if that's asynchronous outside the try/catch.
+      // Given the structure, it's fine here as verification prepare is awaited.
+      // setIsLoading(false);
     }
   };
 
@@ -352,23 +382,15 @@ const industryMap = new Map([
           {/* زر التسجيل */}
           <View className="items-center">
             <CustomButton
-              title={isLoading ? '' : t.signUpButton}
+              title={t.signUpButton}
               onPress={onSignUpPress}
+              loading={isLoading}
               disabled={isLoading}
-              className={isLoading ? 'opacity-70' : ''}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                t.signUpButton
-              )}
-            </CustomButton>
-       
-
+            />
 
             {/* رابط الانتقال إلى تسجيل الدخول */}
- <Link href="/(auth)/sign-in" className={`text-lg text-center text-general-200 mt-4 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
-               <Text>{t.alreadyHaveAccount}</Text>
+            <Link href="/(auth)/sign-in" className={`text-lg text-center text-general-200 mt-4 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'}`}>
+              <Text>{t.alreadyHaveAccount}</Text>
               <Text className="text-orange-500"> {t.logIn}</Text>
             </Link>
           </View>
@@ -425,107 +447,104 @@ const industryMap = new Map([
             </View>
           </View>
         </Modal>
-{/* نافذة التحقق */}
-<Modal
- key="verification-modal"
-  visible={verification.state === "pending"}
-  transparent={true} // لجعل الخلفية شفافة
-  animationType="slide" // لإضافة رسوم متحركة
-  onRequestClose={() => {
-    if (verification.state === "success") {
-      console.log("Verification successful, showing success modal"); // Debugging
-      setShowSuccessModal(true);
-    }
-  }}
->
-  <View className="flex-1 justify-center items-center bg-black/50">
-    <View className="bg-white p-7 rounded-2xl min-h-[300px] w-11/12">
-      <Text className={`${language === 'ar' ? 'text-right font-CairoExtraBold' : 'text-left font-JakartaExtraBold'} text-2xl mb-2`}>
-        {t.Verification}
-      </Text>
-  <Text className={`${language === 'ar' ? 'text-right font-CairoMedium' : 'text-left font-Jakarta '} text-lg mb-5`}>
-        {t.SendVCode}{form.email}.
-      </Text>
-      <InputField
-        label={t.Code}
-        icon={icons.lock}
-        placeholder={"12345"}
-        value={verification.code}
-        keyboardType="numeric"
-        onChangeText={(code) => setVerification({ ...verification, code })}
-        iconStyle="mt-3 mr-3"
-        maxLength={6}
-        accessibilityLabel="Enter verification code"
-        labelStyle={language === 'ar' ? 'text-right font-CairoBold ' : 'text-left font-JakartaBold '}
 
-      />
-      {verification.error && (
-        <Text className="text-red-500 text-sm mt-1">
-          {verification.error}
-        </Text>
-      )}
-      <CustomButton
-        title={t.VerifyEmail}
-        onPress={onVerifyPress}
-        className="mt-5 bg-success-500"
-        accessibilityLabel="Verify Email Button"
-        disabled={verification.code.length < 6} // Disable until 6 digits are entered
-      />
-    </View>
-  </View>
-</Modal>
+        {/* نافذة التحقق */}
+        <Modal
+          key="verification-modal"
+          visible={verification.state === "pending"}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => {
+            if (verification.state === "success") {
+              console.log("Verification successful, showing success modal");
+              setShowSuccessModal(true);
+            }
+          }}
+        >
+          <View className="flex-1 justify-center items-center bg-black/50">
+            <View className="bg-white p-7 rounded-2xl min-h-[300px] w-11/12">
+              <Text className={`${language === 'ar' ? 'text-right font-CairoExtraBold' : 'text-left font-JakartaExtraBold'} text-2xl mb-2`}>
+                {t.Verification}
+              </Text>
+              <Text className={`${language === 'ar' ? 'text-right font-CairoMedium' : 'text-left font-Jakarta '} text-lg mb-5`}>
+                {t.SendVCode}{form.email}.
+              </Text>
+              <InputField
+                label={t.Code}
+                icon={icons.lock}
+                placeholder={"12345"}
+                value={verification.code}
+                keyboardType="numeric"
+                onChangeText={(code) => setVerification({ ...verification, code })}
+                iconStyle="mt-3 mr-3"
+                maxLength={6}
+                accessibilityLabel="Enter verification code"
+                labelStyle={language === 'ar' ? 'text-right font-CairoBold ' : 'text-left font-JakartaBold '}
+              />
+              {verification.error && (
+                <Text className="text-red-500 text-sm mt-1">
+                  {verification.error}
+                </Text>
+              )}
+              <CustomButton
+                title={t.VerifyEmail}
+                onPress={onVerifyPress}
+                className="mt-5 bg-success-500"
+                accessibilityLabel="Verify Email Button"
+                disabled={verification.code.length < 6}
+              />
+            </View>
+          </View>
+        </Modal>
 
-{/* نافذة النجاح */}
-<Modal
-  key="success-modal"
-  visible={showSuccessModal}
-  transparent={true} // لجعل الخلفية شفافة
-  animationType="slide" // لإضافة رسوم متحركة
-  onRequestClose={() => {
-    console.log("Success modal hidden"); // Debugging
-  }}
->
-  <View className="flex-1 justify-center items-center bg-black/50">
-    <View className="bg-white p-7 rounded-2xl min-h-[300px] w-11/12">
-      <Image
-        source={images.check}
-        className="w-[110px] h-[110px] mx-auto my-5"
-        accessibilityLabel="Success check icon"
-      />
-      <Text className={`text-3xl ${language === 'ar' ? 'font-CairoBold pt-3' : 'font-JakartaBold'} text-center`}>
-        {t.verified}
-      </Text>
-      <Text className={`text-base text-gray-400 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-center mt-2`}>
-        {t.verificationSuccess}
-      </Text>
-      <CustomButton
-        title={t.browseHome}
-        onPress={() => {
-          setShowSuccessModal(false);
-          router.replace("/home");
-        }}
-        className="mt-5"
-     
+        {/* نافذة النجاح */}
+        <Modal
+          key="success-modal"
+          visible={showSuccessModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => {
+            console.log("Success modal hidden");
+          }}
+        >
+          <View className="flex-1 justify-center items-center bg-black/50">
+            <View className="bg-white p-7 rounded-2xl min-h-[300px] w-11/12">
+              <Image
+                source={images.check}
+                className="w-[110px] h-[110px] mx-auto my-5"
+                accessibilityLabel="Success check icon"
+              />
+              <Text className={`text-3xl ${language === 'ar' ? 'font-CairoBold pt-3' : 'font-JakartaBold'} text-center`}>
+                {t.verified}
+              </Text>
+              <Text className={`text-base text-gray-400 ${language === 'ar' ? 'font-CairoBold' : 'font-JakartaBold'} text-center mt-2`}>
+                {t.verificationSuccess}
+              </Text>
+              <CustomButton
+                title={t.browseHome}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.replace("/home");
+                }}
+                className="mt-5"
+                accessibilityLabel="Navigate to Home"
+              />
+            </View>
+          </View>
+        </Modal>
 
-        accessibilityLabel="Navigate to Home"
-        
-      />
-    </View>
-  </View>
-</Modal>
-
-{/* Custom Error Modal */}
-<CustomErrorModal
-  visible={showCustomErrorModal}
-  message={customErrorMessage}
-  onClose={() => setShowCustomErrorModal(false)}
-  title={t.error}
-/>
-
+        {/* Custom Error Modal */}
+        <CustomErrorModal
+          visible={showCustomErrorModal}
+          message={customErrorMessage}
+          onClose={() => setShowCustomErrorModal(false)}
+          title={t.error}
+          t={t}
+        />
       </ScrollView>
-      </View>
-      <StatusBar backgroundColor="#fff" style="dark" />
-      </SafeAreaView>
+    </View>
+    <StatusBar backgroundColor="#fff" style="dark" />
+  </SafeAreaView>
   );
 };
 

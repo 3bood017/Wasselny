@@ -696,11 +696,25 @@ const SuggestedRidesComponent = forwardRef<SuggestedRidesRef, SuggestedRidesProp
 
   if (rides.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center py-4">
-        <Ionicons name="search-outline" size={64} color="#9CA3AF" />
-        <Text className={`text-gray-500 text-center mt-4 font-CairoMedium ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-          {language === 'ar' ? 'لا توجد رحلات متاحة' : 'No rides available'}
-        </Text>
+      <View className="flex-1 items-center justify-center py-8 px-4">
+        <View className="bg-white rounded-2xl p-6 items-center" style={[Platform.OS === 'android' ? styles.androidShadow : styles.iosShadow]}>
+          <Image 
+            source={require('@/assets/images/no-result.png')}
+            className="w-32 h-32 mb-6"
+            resizeMode="contain"
+          />
+          <Text className={`text-xl font-CairoBold text-gray-800 mb-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+            {language === 'ar' ? 'لا توجد رحلات متاحة' : 'No Rides Available'}
+          </Text>
+          <TouchableOpacity 
+            onPress={fetchRides}
+            className="bg-orange-500 px-6 py-3 rounded-full"
+          >
+            <Text className="text-white font-CairoMedium">
+              {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
