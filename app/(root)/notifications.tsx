@@ -133,8 +133,8 @@ export default function Notifications() {
           <View className="flex-row items-center">
             <Text className="text-2xl font-CairoBold text-gray-900">الإشعارات</Text>
             {unreadCount > 0 && (
-              <View className="mr-2 bg-orange-500 rounded-full w-6 h-6 items-center justify-center">
-                <Text className="text-white text-xs font-CairoBold">{unreadCount}</Text>
+              <View className="mr-2 bg-orange-500 mb-3 rounded-full w-7 h-7 items-center justify-center border-2 border-white shadow-sm">
+                <Text className="text-white text-sm mt-1 font-CairoBold">{unreadCount}</Text>
               </View>
             )}
           </View>

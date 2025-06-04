@@ -481,8 +481,10 @@ const DriverApplications = () => {
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, {
         type: 'driver_status',
-        title: 'Driver Application Approved',
-        message: 'Congratulations! Your driver application has been approved. You can now start providing transportation services.',
+        title: language === 'ar' ? 'تمت الموافقة على طلب السائق' : 'Driver Application Approved',
+        message: language === 'ar' 
+          ? 'تهانينا! تمت الموافقة على طلبك كسائق. يمكنك الآن البدء في تقديم خدمات النقل.'
+          : 'Congratulations! Your driver application has been approved. You can now start providing transportation services.',
         created_at: new Date(),
         read: false,
         user_id: applicationId,
@@ -542,8 +544,10 @@ const DriverApplications = () => {
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, {
         type: 'driver_status',
-        title: 'Driver Application Rejected',
-        message: `Your driver application has been rejected for the following reasons:\n${rejectionReason.trim()}\n\nYou can update your information and reapply.`,
+        title: language === 'ar' ? 'تم رفض طلب السائق' : 'Driver Application Rejected',
+        message: language === 'ar' 
+          ? `تم رفض طلبك كسائق للأسباب التالية:\n${rejectionReason.trim()}\n\nيمكنك تحديث معلوماتك وإعادة التقديم.`
+          : `Your driver application has been rejected for the following reasons:\n${rejectionReason.trim()}\n\nYou can update your information and reapply.`,
         created_at: new Date(),
         read: false,
         user_id: selectedApplication.id,
