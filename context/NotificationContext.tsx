@@ -17,7 +17,7 @@ interface NotificationData {
 
 interface Notification {
   id: string;
-  type: 'ride_reminder' | 'chat' | 'ride_request' | 'ride_status';
+  type: 'ride_reminder' | 'chat' | 'ride_request' | 'ride_status' | 'ride_complete' | 'check_in' | 'check_out';
   title: string;
   message: string;
   createdAt: Date;
@@ -60,8 +60,29 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data;
-      if (data.rideId) {
-        router.push(`/ride-details/${data.rideId}`);
+      
+      // Navigate based on notification type
+      switch (data.type) {
+        case 'location_update':
+          router.push('/track');
+          break;
+        case 'ride_request':
+        case 'ride_status':
+        case 'ride_complete':
+        case 'check_in':
+        case 'check_out':
+          if (data.rideId) {
+            router.push(`/ride-details/${data.rideId}`);
+          }
+          break;
+        case 'chat':
+          if (data.chatId) {
+            router.push(`/chat/${data.chatId}`);
+          }
+          break;
+        default:
+          // For any other notification type, just refresh the notifications
+          refreshNotifications();
       }
     });
 

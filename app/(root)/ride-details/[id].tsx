@@ -1502,7 +1502,7 @@ const RideDetails = () => {
         {allPassengers.length > 0 ? (
           <View className="border border-gray-200 rounded-lg overflow-hidden">
             <View className={`flex-row bg-gray-50 p-3 border-b border-gray-200 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <View className="w-28">
+              <View className="w-32">
                 <Text className={`text-sm font-CairoBold text-gray-700 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {language === 'ar' ? 'الاسم' : 'Name'}
                 </Text>
@@ -1520,7 +1520,7 @@ const RideDetails = () => {
                 </View>
                   {allPassengers.map((passenger) => (
                      <View key={passenger.id} className={`flex-row p-3 border-b border-gray-100 ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                      <View className="w-28">
+                      <View className="w-32">
                           <View className={`items-center ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                            <Image
                         source={icons.person}
