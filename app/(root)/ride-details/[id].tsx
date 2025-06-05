@@ -898,27 +898,20 @@ const RideDetails = () => {
         cancelText: language === 'ar' ? 'لا' : 'No',
         onConfirm: async () => {
           try {
-            // Request location permissions
-            let { status } = await Location.requestForegroundPermissionsAsync();
+            const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
               showAlert({
-                title: language === 'ar' ? 'تنبيه الموقع' : 'Location Alert',
-                message: language === 'ar' 
-                  ? 'يجب منح إذن للوصول إلى الموقع لاستخدام ميزات التتبع' 
-                  : 'Location permission is required to use the tracking features.',
-                type: 'warning'
+                title: language === 'ar' ? "خطأ" : "Error",
+                message: language === 'ar' ? "يجب السماح بالوصول إلى الموقع لمشاركته" : "Location permission is required to share location",
+                type: 'error'
               });
               return;
             }
 
-            // Get current location
-            const location = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced
-            });
-
+            const location = await Location.getCurrentPositionAsync({});
             const currentTime = new Date().toISOString();
 
-            // Get all active shares where user is the sharer
+            // Get all active location shares
             const sharesQuery = query(
               collection(db, 'location_sharing'),
               where('sharer_id', '==', userId),
@@ -973,6 +966,9 @@ const RideDetails = () => {
               message: language === 'ar' ? "تم تسجيل خروجك بنجاح" : "Successfully checked out",
               type: 'success'
             });
+
+            // Show rating modal after successful checkout
+            setShowRatingModal(true);
           } catch (error) {
             console.error('Error during check-out:', error);
             showAlert({
@@ -2131,7 +2127,7 @@ const RideDetails = () => {
               {/* Overall Rating */}
               <View className="bg-gray-50 p-4 rounded-xl">
                 <Text className="text-lg font-CairoBold mb-3 text-right text-gray-800">التقييم العام</Text>
-                <View className="py-2">
+                <View className="py-2" style={{ transform: [{ scaleX: -1 }] }}>
                   <AirbnbRating
                     reviewColor="#F79824"
                     showRating={true}
@@ -2150,7 +2146,7 @@ const RideDetails = () => {
                   <Text className="text-lg font-CairoBold text-gray-800">قيادة السيارة</Text>
                   <MaterialIcons name="directions-car" size={24} color="#f97316" />
                 </View>
-                <View className="py-2">
+                <View className="py-2" style={{ transform: [{ scaleX: -1 }] }}>
                   <AirbnbRating
                     reviewColor="#F79824"
                     showRating={true}
@@ -2169,7 +2165,7 @@ const RideDetails = () => {
                   <Text className="text-lg font-CairoBold text-gray-800">الأخلاق والسلوك</Text>
                   <MaterialIcons name="people" size={24} color="#f97316" />
                 </View>
-                <View className="py-2">
+                <View className="py-2" style={{ transform: [{ scaleX: -1 }] }}>
                   <AirbnbRating
                     reviewColor="#F79824"
                     showRating={true}
@@ -2188,7 +2184,7 @@ const RideDetails = () => {
                   <Text className="text-lg font-CairoBold text-gray-800">الالتزام بالمواعيد</Text>
                   <MaterialIcons name="access-time" size={24} color="#f97316" />
                 </View>
-                <View className="py-2">
+                <View className="py-2" style={{ transform: [{ scaleX: -1 }] }}>
                   <AirbnbRating
                     reviewColor="#F79824"
                     showRating={true}
@@ -2207,7 +2203,7 @@ const RideDetails = () => {
                   <Text className="text-lg font-CairoBold text-gray-800">نظافة السيارة</Text>
                   <MaterialIcons name="cleaning-services" size={24} color="#f97316" />
                 </View>
-                <View className="py-2">
+                <View className="py-2" style={{ transform: [{ scaleX: -1 }] }}>
                   <AirbnbRating
                     reviewColor="#F79824"
                     showRating={true}
