@@ -541,6 +541,15 @@ const DriverApplications = () => {
         'driver.rejected_at': new Date().toISOString()
       });
 
+      // Get admin user ID
+      const adminQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
+      const adminSnapshot = await getDocs(adminQuery);
+      const adminDoc = adminSnapshot.docs[0];
+      
+      if (!adminDoc) {
+        throw new Error('Admin user not found');
+      }
+
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, {
         type: 'driver_status',
@@ -553,7 +562,8 @@ const DriverApplications = () => {
         user_id: selectedApplication.id,
         data: {
           status: 'rejected',
-          rejection_reason: rejectionReason.trim()
+          rejection_reason: rejectionReason.trim(),
+          type: 'driver_status'
         }
       });
 
@@ -734,14 +744,7 @@ const DriverApplications = () => {
                     {application.car_seats}
                   </Text>
                 </View>
-                <View className={`flex-row justify-between ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'}`}>
-                    {language === 'ar' ? 'رقم الترخيص:' : 'License Number:'}
-                  </Text>
-                  <Text className={`${language === 'ar' ? 'font-CairoMedium text-right' : 'font-JakartaMedium text-left'}`}>
-                    {application.license_number || (language === 'ar' ? 'غير متوفر' : 'Not provided')}
-                  </Text>
-                </View>
+                
                 <View className={`flex-row justify-between ${language === 'ar' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <Text className={`text-gray-500 ${language === 'ar' ? 'font-CairoRegular text-right' : 'font-JakartaRegular text-left'}`}>
                     {language === 'ar' ? 'تاريخ التقديم:' : 'Applied on:'}

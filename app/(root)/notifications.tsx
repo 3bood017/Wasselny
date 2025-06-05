@@ -129,16 +129,22 @@ export default function Notifications() {
         case 'location_update':
           router.push('/track');
           break;
+          case 'driver_status' :
+            router.push('/driverInfo');
+            break; 
+            case 'driver_request' :
+            router.push('/(root)/admin/driverApplications');
+            break;  
         case 'ride_request':
         case 'ride_status':
         case 'ride_complete':
         case 'check_in':
         case 'check_out':
-          if (notification.data?.rideId) {
-            router.push({
-              pathname: '/(root)/ride-details/[id]',
-              params: { id: notification.data.rideId, expandSheet: 'true' }
-            });
+      if (notification.data?.rideId) {
+        router.push({
+          pathname: '/(root)/ride-details/[id]',
+          params: { id: notification.data.rideId, expandSheet: 'true' }
+        });
           }
           break;
         case 'chat':

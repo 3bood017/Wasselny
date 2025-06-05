@@ -29,6 +29,7 @@ interface Notification {
   data?: NotificationData;
 }
 
+
 type NotificationContextType = {
   notifications: Notification[];
   markAsRead: (notificationId: string) => Promise<void>;
@@ -66,13 +67,19 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         case 'location_update':
           router.push('/track');
           break;
+          case 'driver_status' :
+            router.push('/driverInfo');
+            break;
+            case 'driver_request' :
+            router.push('/(root)/admin/driverApplications');
+            break;  
         case 'ride_request':
         case 'ride_status':
         case 'ride_complete':
         case 'check_in':
         case 'check_out':
-          if (data.rideId) {
-            router.push(`/ride-details/${data.rideId}`);
+      if (data.rideId) {
+        router.push(`/ride-details/${data.rideId}`);
           }
           break;
         case 'chat':
