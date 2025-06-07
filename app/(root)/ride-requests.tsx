@@ -526,9 +526,7 @@ const RideRequests = () => {
           const passengerNotificationId = await scheduleRideNotification(params.rideId as string, userId, false);
           const driverNotificationId = await scheduleRideNotification(params.rideId as string, params.driverId as string, true);
 
-         
-         
-
+          // Update the ride request status
           await updateDoc(doc(db, 'ride_requests', requestId), {
             status: 'accepted',
             updated_at: serverTimestamp(),
@@ -536,6 +534,15 @@ const RideRequests = () => {
             passenger_id: userId,
             notification_id: passengerNotificationId || null
           });
+
+          // Check if all seats are now taken and update ride status if needed
+          const updatedTotalSeatsTaken = totalSeatsTaken + requestedSeats;
+          if (updatedTotalSeatsTaken >= availableSeats && rideData?.status === 'available') {
+            await updateDoc(doc(db, 'rides', params.rideId as string), {
+              status: 'full',
+              updated_at: serverTimestamp()
+            });
+          }
 
           await sendRideStatusNotification(
             userId,
@@ -648,16 +655,36 @@ const RideRequests = () => {
           // Get the ride details to update available seats
           const rideDoc = await getDoc(doc(db, 'rides', params.rideId as string));
           const rideData = rideDoc.data();
-          const currentAvailableSeats = rideData?.available_seats || 0;
+          const availableSeats = rideData?.available_seats || 0;
 
-          // Update the ride's available seats
-         
+          // Get all current passengers to calculate total seats taken
+          const currentPassengersQuery = query(
+            collection(db, 'ride_requests'),
+            where('ride_id', '==', params.rideId),
+            where('status', 'in', ['accepted', 'checked_in'])
+          );
+          const currentPassengersSnapshot = await getDocs(currentPassengersQuery);
+          
+          let totalSeatsTaken = 0;
+          currentPassengersSnapshot.forEach(doc => {
+            const passengerData = doc.data();
+            totalSeatsTaken += passengerData.requested_seats || 1;
+          });
 
           // Update the request status
           await updateDoc(doc(db, 'ride_requests', requestId), {
             status: 'cancelled',
             updated_at: serverTimestamp(),
           });
+
+          // Check if we need to update ride status back to available
+          const remainingSeats = totalSeatsTaken - requestedSeats;
+          if (remainingSeats < availableSeats && rideData?.status === 'full') {
+            await updateDoc(doc(db, 'rides', params.rideId as string), {
+              status: 'available',
+              updated_at: serverTimestamp()
+            });
+          }
 
           // Send notification to passenger
           await sendRideStatusNotification(

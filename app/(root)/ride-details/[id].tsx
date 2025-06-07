@@ -1889,49 +1889,14 @@ const RideDetails = () => {
     if (ride?.id && ride?.available_seats !== undefined) {
       const totalSeatsTaken = calculateTotalSeatsTaken();
       const availableSeats = (ride?.available_seats || 0);
-      
-      // Only update status if ride is not in-progress or completed
-      if (ride?.status !== 'in-progress' && ride?.status !== 'completed') {
-        if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
-          updateDoc(doc(db, 'rides', ride.id), {
-            status: 'full',
-            updated_at: serverTimestamp(),
-          });
-        }
-
-        if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
-          updateDoc(doc(db, 'rides', ride.id), {
-            status: 'available',
-            updated_at: serverTimestamp(),
-          });
-        }
-      }
     }
   }, [ride?.id, ride?.available_seats, ride?.status, calculateTotalSeatsTaken, allPassengers]);
 
   const renderActionButtons = useCallback(() => {
     if (isDriver) {
-      // Check if ride is full based on available seats and total seats taken
       const totalSeatsTaken = calculateTotalSeatsTaken();
       const availableSeats = (ride?.available_seats || 0) - totalSeatsTaken;
       
-      // Only update status if ride is not in-progress or completed
-      if (ride?.status !== 'in-progress' && ride?.status !== 'completed') {
-        if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
-          updateDoc(doc(db, 'rides', ride.id), {
-            status: 'full',
-            updated_at: serverTimestamp(),
-          });
-        }
-
-        if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
-          updateDoc(doc(db, 'rides', ride.id), {
-            status: 'available',
-            updated_at: serverTimestamp(),
-          });
-        }
-      }
-
       switch (ride?.status) {
         case 'available':
         case 'full':
