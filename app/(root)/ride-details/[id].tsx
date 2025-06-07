@@ -1890,20 +1890,21 @@ const RideDetails = () => {
       const totalSeatsTaken = calculateTotalSeatsTaken();
       const availableSeats = (ride?.available_seats || 0);
       
-      // Only update to 'full' if the ride is 'available' and all seats are taken
-      if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
-        updateDoc(doc(db, 'rides', ride.id), {
-          status: 'full',
-          updated_at: serverTimestamp(),
-        });
-      }
+      // Only update status if ride is not in-progress or completed
+      if (ride?.status !== 'in-progress' && ride?.status !== 'completed') {
+        if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
+          updateDoc(doc(db, 'rides', ride.id), {
+            status: 'full',
+            updated_at: serverTimestamp(),
+          });
+        }
 
-      // Only update to 'available' if the ride is 'full' and seats become available
-      if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
-        updateDoc(doc(db, 'rides', ride.id), {
-          status: 'available',
-          updated_at: serverTimestamp(),
-        });
+        if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
+          updateDoc(doc(db, 'rides', ride.id), {
+            status: 'available',
+            updated_at: serverTimestamp(),
+          });
+        }
       }
     }
   }, [ride?.id, ride?.available_seats, ride?.status, calculateTotalSeatsTaken, allPassengers]);
@@ -1914,14 +1915,16 @@ const RideDetails = () => {
       const totalSeatsTaken = calculateTotalSeatsTaken();
       const availableSeats = (ride?.available_seats || 0) - totalSeatsTaken;
       
-      // Only update status if the ride is in 'available' or 'full' state
-      if (ride?.status === 'available' || ride?.status === 'full') {
+      // Only update status if ride is not in-progress or completed
+      if (ride?.status !== 'in-progress' && ride?.status !== 'completed') {
         if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
           updateDoc(doc(db, 'rides', ride.id), {
             status: 'full',
             updated_at: serverTimestamp(),
           });
-        } else if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
+        }
+
+        if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
           updateDoc(doc(db, 'rides', ride.id), {
             status: 'available',
             updated_at: serverTimestamp(),
