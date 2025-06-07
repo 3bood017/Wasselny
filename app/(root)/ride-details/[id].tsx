@@ -540,9 +540,11 @@ const RideDetails = () => {
 
       // Show waypoint selection if available
       if (ride.waypoints && ride.waypoints.length > 0) {
+        setSelectedSeats(seats);
         setShowWaypointModal(true);
       } else {
-        handleBookRideWithWaypoint(null, seats);
+        setSelectedSeats(seats);
+        handleBookRideWithWaypoint(null);
       }
     } catch (error) {
       console.error('Booking error:', error);
@@ -551,7 +553,7 @@ const RideDetails = () => {
   };
 
   // Add new function to handle booking with waypoint
-  const handleBookRideWithWaypoint = async (waypoint: { latitude: number; longitude: number; address: string; street?: string } | null, seats: number = 1) => {
+  const handleBookRideWithWaypoint = async (waypoint: { latitude: number; longitude: number; address: string; street?: string } | null) => {
     try {
       const userDoc = await getDoc(doc(db, 'users', userId as string));
       const userData = userDoc.data();
@@ -566,7 +568,7 @@ const RideDetails = () => {
         created_at: serverTimestamp(),
         passenger_name: userName,
         is_waitlist: ride?.available_seats === 0,
-        requested_seats: seats,
+        requested_seats: selectedSeats,
         selected_waypoint: waypoint ? {
           latitude: waypoint.latitude,
           longitude: waypoint.longitude,
