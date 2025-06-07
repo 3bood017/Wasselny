@@ -1886,10 +1886,11 @@ const RideDetails = () => {
 
   // Add useEffect to automatically update ride status
   useEffect(() => {
-    if (ride?.id) {
+    if (ride?.id && ride?.available_seats !== undefined) {
       const totalSeatsTaken = calculateTotalSeatsTaken();
       const availableSeats = (ride?.available_seats || 0);
       
+      // Only update to 'full' if the ride is 'available' and all seats are taken
       if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
         updateDoc(doc(db, 'rides', ride.id), {
           status: 'full',
@@ -1897,6 +1898,7 @@ const RideDetails = () => {
         });
       }
 
+      // Only update to 'available' if the ride is 'full' and seats become available
       if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
         updateDoc(doc(db, 'rides', ride.id), {
           status: 'available',
@@ -1912,18 +1914,19 @@ const RideDetails = () => {
       const totalSeatsTaken = calculateTotalSeatsTaken();
       const availableSeats = (ride?.available_seats || 0) - totalSeatsTaken;
       
-      if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
-        updateDoc(doc(db, 'rides', ride.id), {
-          status: 'full',
-          updated_at: serverTimestamp(),
-        });
-      }
-
-      if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
-        updateDoc(doc(db, 'rides', ride.id), {
-          status: 'available',
-          updated_at: serverTimestamp(),
-        });
+      // Only update status if the ride is in 'available' or 'full' state
+      if (ride?.status === 'available' || ride?.status === 'full') {
+        if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
+          updateDoc(doc(db, 'rides', ride.id), {
+            status: 'full',
+            updated_at: serverTimestamp(),
+          });
+        } else if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
+          updateDoc(doc(db, 'rides', ride.id), {
+            status: 'available',
+            updated_at: serverTimestamp(),
+          });
+        }
       }
 
       switch (ride?.status) {
