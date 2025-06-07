@@ -353,6 +353,7 @@ export interface TranslationKeys {
   invalidCode: string;
   emailTaken: string;
   invalidEmailFormat: string;
+  rideSeats: string;
 }
 
 export interface Translations {
@@ -645,6 +646,7 @@ export const translations: Translations = {
     daysNotSpecified: "الأيام غير محددة",
     stop: "نقطة توقف",
     passenger: "الراكب",
+    rideSeats: " عدد مقاعد السيارة اقل من عدد المقاعد المطلوب" ,
     rideOrDriverDataMissing: "بيانات الرحلة أو السائق غير متوفرة",
     bookingAccepted: "تم قبول طلب الحجز!",
     bookingAcceptedForRide: "تم قبول طلب حجزك للرحلة من",
@@ -1120,5 +1122,6 @@ export const translations: Translations = {
     invalidCode: "The verification code is invalid or expired.",
     emailTaken: "That email address is taken. Please try another.",
     invalidEmailFormat: "email_address must be a valid email address.",
+    rideSeats: "Number of Ride Seats upper than the seats you want"
   },
 };

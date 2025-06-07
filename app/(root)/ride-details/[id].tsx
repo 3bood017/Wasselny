@@ -466,9 +466,10 @@ const RideDetails = () => {
         });
         return;
       }
+      const totalSeatsTaken = calculateTotalSeatsTaken();
 
       // Check if ride is full
-      if (ride.available_seats === undefined || ride.available_seats <= 0) {
+      if (ride.available_seats === undefined || ride.available_seats <= totalSeatsTaken) {
         showAlert({
           title: language === 'ar' ? "الرحلة ممتلئة" : "Full",
           message: language === 'ar' ? "الرحلة ممتلئة حالياً، ولكن يمكنك إرسال طلب حجز. إذا غادر أي راكب، سيتم إخطارك عند قبول طلبك." : "The ride is full at the moment, but you can still book a seat. If any passenger leaves, you will be notified when your request is accepted.",
@@ -1213,10 +1214,27 @@ const RideDetails = () => {
 
   // Add this function to calculate total seats taken
   const calculateTotalSeatsTaken = useCallback(() => {
-    return allPassengers.reduce((total, passenger) => {
+    const totalSeats = allPassengers.reduce((total, passenger) => {
       return total + (passenger.requested_seats || 1);
     }, 0);
-  }, [allPassengers]);
+
+    // Log current seats in ride
+    console.log('Current seats in ride:', {
+      rideId: ride?.id,
+      totalSeatsTaken: totalSeats,
+      availableSeats: ride?.available_seats || 0,
+      passengers: allPassengers.map(p => ({
+        id: p.id,
+        name: p.passenger_name,
+        requestedSeats: p.requested_seats || 1,
+        status: p.status
+      })),
+      rideStatus: ride?.status,
+      timestamp: new Date().toISOString()
+    });
+
+    return totalSeats;
+  }, [allPassengers, ride?.id, ride?.driver?.car_seats, ride?.available_seats, ride?.status]);
 
   // Render ride details
   const renderRideDetails = useCallback(
@@ -1864,13 +1882,44 @@ const RideDetails = () => {
     }
   };
 
-  // Modify the renderActionButtons function to remove on-hold status
-  const renderActionButtons = useCallback(() => {
-    if (isDriver) {
-      // Check if ride is full
-      if (ride?.available_seats === 0 && ride.status === 'available') {
+  // Add useEffect to automatically update ride status
+  useEffect(() => {
+    if (ride?.id) {
+      const totalSeatsTaken = calculateTotalSeatsTaken();
+      const availableSeats = (ride?.available_seats || 0);
+      
+      if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
         updateDoc(doc(db, 'rides', ride.id), {
           status: 'full',
+          updated_at: serverTimestamp(),
+        });
+      }
+
+      if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
+        updateDoc(doc(db, 'rides', ride.id), {
+          status: 'available',
+          updated_at: serverTimestamp(),
+        });
+      }
+    }
+  }, [ride?.id, ride?.available_seats, ride?.status, calculateTotalSeatsTaken, allPassengers]);
+
+  const renderActionButtons = useCallback(() => {
+    if (isDriver) {
+      // Check if ride is full based on available seats and total seats taken
+      const totalSeatsTaken = calculateTotalSeatsTaken();
+      const availableSeats = (ride?.available_seats || 0) - totalSeatsTaken;
+      
+      if (availableSeats <= totalSeatsTaken && ride?.status === 'available') {
+        updateDoc(doc(db, 'rides', ride.id), {
+          status: 'full',
+          updated_at: serverTimestamp(),
+        });
+      }
+
+      if (availableSeats > totalSeatsTaken && ride?.status === 'full') {
+        updateDoc(doc(db, 'rides', ride.id), {
+          status: 'available',
           updated_at: serverTimestamp(),
         });
       }
@@ -1948,18 +1997,20 @@ const RideDetails = () => {
       }
     } else {
       // Passenger buttons
+      const totalSeatsTaken = calculateTotalSeatsTaken();
+console.log("fsdfsfsdfsdfsdfs",totalSeatsTaken)
       if (!rideRequest) {
         // Show book button if ride is available or full
         if (ride?.status === 'available' || ride?.status === 'full') {
           return (
             <View className="p-4 m-3">
               <CustomButton
-                title={ride.available_seats > 0 
+                title={ride.available_seats > totalSeatsTaken 
                   ? (language === 'ar' ? "طلب حجز الرحلة" : "Book Ride")
                   : (language === 'ar' ? "طلب حجز (قائمة الانتظار)" : "Book (Waitlist)")
                 }
                 onPress={handleBookRide}
-                className={`${ride.available_seats > 0 ? "bg-orange-500" : "bg-yellow-500"} py-3 rounded-xl`}
+                className={`${ride.available_seats > totalSeatsTaken ? "bg-orange-500" : "bg-yellow-500"} py-3 rounded-xl`}
               />
             </View>
           );
@@ -2098,7 +2149,7 @@ const RideDetails = () => {
         }
       }
     }
-  }, [isDriver, ride, rideRequest, allPassengers, isRideTime, language]);
+  }, [isDriver, ride, rideRequest, allPassengers, isRideTime, language, calculateTotalSeatsTaken]);
 
   useEffect(() => {
     fetchRideDetails();
