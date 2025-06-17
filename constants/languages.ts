@@ -354,6 +354,7 @@ export interface TranslationKeys {
   emailTaken: string;
   invalidEmailFormat: string;
   rideSeats: string;
+  TotalRating: string;
 }
 
 export interface Translations {
@@ -646,6 +647,7 @@ export const translations: Translations = {
     daysNotSpecified: "الأيام غير محددة",
     stop: "نقطة توقف",
     passenger: "الراكب",
+    TotalRating: "اجمالي التقييمات",
     rideSeats: " عدد مقاعد السيارة اقل من عدد المقاعد المطلوب" ,
     rideOrDriverDataMissing: "بيانات الرحلة أو السائق غير متوفرة",
     bookingAccepted: "تم قبول طلب الحجز!",
@@ -890,6 +892,7 @@ export const translations: Translations = {
     available: 'Available',
     from: 'From',
     to: 'To',
+    TotalRating: " Total Rating",
     user: "User",
     seats: 'seats',
     retry: 'Retry',
