@@ -476,20 +476,20 @@ const Profile = () => {
         {/* Profile Header */}
         <View className="items-center mt-6 mb-4">
           <TouchableOpacity onPress={() => setShowFullImage(true)} className="relative">
-            {userData.profileImage || user?.imageUrl ? (
-              <Image
-                source={{ uri: userData.profileImage || user?.imageUrl }}
-                className="w-24 h-24 rounded-full"
-              />
+            {isUploading ? (
+              <View className="w-full aspect-square bg-gray-200 items-center justify-center">
+                <ActivityIndicator size="large" color="#f97316" />
+              </View>
             ) : (
-              <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#f97316' }}>
-                <MaterialIcons name="person" size={60} color="#f97316" />
-              </View>
-            )}
-            {isUploading && (
-              <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
-                <ActivityIndicator color="white" />
-              </View>
+              <Image
+                source={{ 
+                  uri: userData.isDriver 
+                    ? userData.data?.driver?.profile_image_url 
+                    : userData.data?.profile_image_url || user?.imageUrl || 'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png'
+                }}
+                className="w-24 h-24 rounded-full"
+                resizeMode="cover"
+              />
             )}
             <TouchableOpacity 
               onPress={handleImagePick} 
